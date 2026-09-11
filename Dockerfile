@@ -67,8 +67,6 @@ CMD ["sh", "-c", \
        --workers ${WORKERS:-2} \
        --worker-class uvicorn.workers.UvicornWorker \
        --bind 0.0.0.0:${PORT:-8000} \
-       --bind 0.0.0.0:8000 \
-       --bind 0.0.0.0:10000 \
        --timeout 120 \
        --keep-alive 5 \
        --access-logfile - \
