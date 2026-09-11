@@ -1,6 +1,7 @@
 # ─────────────────────────────────────────────────────────────────────────────
 # LabelSure Backend — Production Dockerfile
 # Multi-stage build: keeps final image lean by not including build tools.
+# Binds dynamically to $PORT assigned by Render, Railway, or Docker Compose.
 # ─────────────────────────────────────────────────────────────────────────────
 
 # Stage 1: Python dependency builder
@@ -8,9 +9,10 @@ FROM python:3.11-slim AS builder
 
 WORKDIR /build
 
-# Install build tools needed for some Python packages (e.g. psycopg2, numpy)
+# Install build tools needed for C extensions (e.g. psycopg2, numpy)
 RUN apt-get update && apt-get install -y --no-install-recommends \
     gcc \
+    g++ \
     libpq-dev \
     && rm -rf /var/lib/apt/lists/*
 
@@ -29,28 +31,22 @@ LABEL org.opencontainers.image.description="FastAPI compliance-scanner backend"
 
 WORKDIR /app
 
-# ─── OS-level dependencies (OCR + CV) ────────────────────────────────────────
-# These CANNOT be pip-installed; they are system packages.
-# Tesseract with Indic language packs + OpenCV runtime libs.
+# ─── OS-level dependencies (OCR + CV + Postgres) ────────────────────────────
+# Tesseract OCR engine with Indic language packs + OpenCV runtime libraries.
 RUN apt-get update && apt-get install -y --no-install-recommends \
-    # Tesseract OCR engine
     tesseract-ocr \
-    # Indic language packs
     tesseract-ocr-hin \
     tesseract-ocr-tam \
     tesseract-ocr-tel \
     tesseract-ocr-kan \
     tesseract-ocr-ben \
-    # OpenCV runtime shared libraries
     libgomp1 \
     libglib2.0-0 \
     libsm6 \
     libxext6 \
     libxrender1 \
-    libgl1-mesa-glx \
-    # PostgreSQL client libs (for asyncpg / psycopg2)
+    libgl1 \
     libpq5 \
-    # curl for health-check in docker-compose
     curl \
     && rm -rf /var/lib/apt/lists/*
 
@@ -60,6 +56,11 @@ COPY --from=builder /install /usr/local
 # ─── Application source ───────────────────────────────────────────────────────
 COPY . .
 
+# ─── Environment defaults ────────────────────────────────────────────────────
+ENV PORT=8000 \
+    PYTHONUNBUFFERED=1 \
+    PYTHONDONTWRITEBYTECODE=1
+
 # ─── Non-root user (security hardening) ──────────────────────────────────────
 RUN useradd --no-create-home --shell /bin/false appuser \
     && mkdir -p uploads \
@@ -68,20 +69,19 @@ RUN useradd --no-create-home --shell /bin/false appuser \
 USER appuser
 
 # ─── Expose ───────────────────────────────────────────────────────────────────
-EXPOSE 8000
+EXPOSE 8000 10000
 
 # ─── Health check ─────────────────────────────────────────────────────────────
-HEALTHCHECK --interval=30s --timeout=10s --start-period=15s --retries=3 \
-    CMD curl -f http://localhost:8000/health || exit 1
+HEALTHCHECK --interval=30s --timeout=10s --start-period=20s --retries=3 \
+    CMD curl -f http://localhost:${PORT}/health || exit 1
 
 # ─── Entrypoint ───────────────────────────────────────────────────────────────
-# Uses gunicorn with UvicornWorker for production-grade ASGI serving.
-# Workers: 2 per CPU core is a typical starting point. Override via WORKERS env var.
+# Binds dynamically to $PORT provided by Render, Railway, or Docker Compose.
 CMD ["sh", "-c", \
      "gunicorn backend.main:app \
        --workers ${WORKERS:-2} \
        --worker-class uvicorn.workers.UvicornWorker \
-       --bind 0.0.0.0:8000 \
+       --bind 0.0.0.0:${PORT:-8000} \
        --timeout 120 \
        --keep-alive 5 \
        --access-logfile - \

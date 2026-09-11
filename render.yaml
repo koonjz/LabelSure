@@ -1,0 +1,23 @@
+# ─────────────────────────────────────────────────────────────────────────────
+# LabelSure — Render Blueprint Specification
+# Deploys the FastAPI backend container to Render automatically.
+# ─────────────────────────────────────────────────────────────────────────────
+services:
+  - type: web
+    name: labelsure-backend
+    env: docker
+    dockerfilePath: Dockerfile
+    healthCheckPath: /health
+    envVars:
+      - key: DATABASE_URL
+        sync: false # Prompts for your Neon PostgreSQL connection string
+      - key: SECRET_KEY
+        generateValue: true # Render automatically generates a 32-byte secure key
+      - key: CORS_ORIGINS
+        value: "*"
+      - key: DEBUG
+        value: "false"
+      - key: LOG_FORMAT
+        value: "json"
+      - key: WORKERS
+        value: "2"

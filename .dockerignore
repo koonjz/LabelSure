@@ -1,0 +1,43 @@
+# Version control
+.git
+.gitignore
+
+# Environments & Local Database
+.env
+.env.local
+.env.*.local
+*.db
+*.sqlite
+*.sqlite3
+
+# Python / Pytest caches & virtual environments
+__pycache__/
+*.py[cod]
+*$py.class
+.pytest_cache/
+.venv/
+venv/
+ENV/
+
+# Web dashboard dependencies & builds
+web_dashboard/node_modules/
+web_dashboard/dist/
+web_dashboard/.env*
+
+# Flutter mobile app build artifacts
+frontend/build/
+frontend/.dart_tool/
+frontend/.pub-cache/
+frontend/.pub/
+
+# Uploaded test files & logs
+uploads/*.png
+uploads/*.jpeg
+uploads/*.jpg
+*.log
+
+# IDE & OS files
+.idea/
+.vscode/
+.DS_Store
+Thumbs.db
