@@ -23,6 +23,7 @@ def test_neon_postgres_url_normalization():
     neon_url = "postgres://alex:secret123@ep-cool-darkness-123456.us-east-2.aws.neon.tech/neondb?sslmode=require"
     norm_url, connect_args = _get_normalized_db_url(neon_url)
     assert norm_url.startswith("postgresql+asyncpg://")
+    assert "sslmode" not in norm_url
     assert connect_args.get("ssl") == "require"
 
 

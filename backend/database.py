@@ -10,11 +10,14 @@ from backend.config import get_settings
 settings = get_settings()
 
 
+from urllib.parse import urlparse, parse_qs, urlencode, urlunparse
+
 def _get_normalized_db_url(url: str) -> tuple[str, dict]:
     """Normalizes PostgreSQL & Neon connection strings for asyncpg.
     
     - Converts 'postgres://' or 'postgresql://' to 'postgresql+asyncpg://'
-    - Prepares connect_args for SSL when connecting to cloud providers (Neon, Render, Supabase)
+    - Strips 'sslmode' query param (which triggers TypeError in asyncpg) and maps it to connect_args['ssl']
+    - Configures SSL for cloud Postgres providers (Neon, Render, Supabase)
     """
     connect_args = {}
 
@@ -28,11 +31,27 @@ def _get_normalized_db_url(url: str) -> tuple[str, dict]:
     elif url.startswith("postgresql://") and not url.startswith("postgresql+"):
         url = url.replace("postgresql://", "postgresql+asyncpg://", 1)
 
-    # SSL handling for Neon and managed cloud Postgres
-    if "sslmode=require" in url or "sslmode=verify-full" in url or "neon.tech" in url:
-        connect_args["ssl"] = "require"
+    # Parse query string and strip sslmode to prevent asyncpg TypeError
+    parsed = urlparse(url)
+    qs = parse_qs(parsed.query)
 
-    return url, connect_args
+    has_sslmode = "sslmode" in qs
+    sslmode_val = qs.pop("sslmode", [None])[0]
+
+    if has_sslmode or "neon.tech" in url:
+        connect_args["ssl"] = "require" if sslmode_val != "disable" else False
+
+    clean_query = urlencode(qs, doseq=True)
+    clean_url = urlunparse((
+        parsed.scheme,
+        parsed.netloc,
+        parsed.path,
+        parsed.params,
+        clean_query,
+        parsed.fragment,
+    ))
+
+    return clean_url, connect_args
 
 
 def _build_engine():
