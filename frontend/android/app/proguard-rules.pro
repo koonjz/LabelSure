@@ -31,3 +31,9 @@
 -keepclassmembers class **.R$* {
     public static <fields>;
 }
+
+# Google Play Core (Flutter deferred components) — suppress R8 missing class errors.
+# These classes are only needed for Play Store dynamic feature delivery,
+# which this app does not use. Safe to ignore.
+-dontwarn com.google.android.play.core.**
+-keep class com.google.android.play.core.** { *; }

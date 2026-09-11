@@ -41,7 +41,7 @@ class AppConfig {
     // Dev default: Android Emulator host gateway.
     // This default is INTENTIONALLY only valid in dev.
     // Release builds must override this — see validation below.
-    defaultValue: 'http://10.0.2.2:8000',
+    defaultValue: 'https://labelsure-jw0d.onrender.com',
   );
 
   // ─── Validated, trimmed URL ────────────────────────────────────────────────
@@ -67,7 +67,7 @@ class AppConfig {
   // ─── Release build validation ─────────────────────────────────────────────
   static void _validateForRelease(String url) {
     assert(
-      url != 'http://10.0.2.2:8000',
+      url.isNotEmpty && url != 'http://10.0.2.2:8000',
       '\n\n'
       '══════════════════════════════════════════════════════════════════\n'
       '  RELEASE BUILD ERROR: API_BASE_URL is still the dev default!\n'

@@ -1,46 +1,31 @@
 <?xml version="1.0" encoding="utf-8"?>
 <!--
-  LabelSure — Network Security Configuration
-  ============================================
-  ⚠️  DEVELOPMENT ONLY — allows plaintext HTTP to local/emulator backend addresses.
-  REMOVE or REPLACE with an HTTPS endpoint before any production release.
-
-  Allowed for cleartext (plain HTTP):
-    • 10.0.2.2        — Android Emulator host machine loopback
-    • 10.0.3.2        — Genymotion emulator host
-    • 192.168.0.0/16  — Common LAN range (physical device → dev machine)
-    • 172.16.0.0/12   — Docker/VPN internal range
-    • 10.0.0.0/8      — Corporate/internal networks
-    • localhost        — fallback
-    • 127.0.0.1       — fallback
-
-  In production, delete the <base-config> and <domain-config> entries below
-  and only allow HTTPS with certificate pinning.
+  LabelSure - Network Security Configuration
+  Allows plaintext HTTP to local/emulator backend addresses (DEV ONLY).
+  Replace with HTTPS endpoint before production release.
 -->
 <network-security-config>
-    <!--
-      Base config: trust system CAs only (no cleartext for other hosts).
-      This keeps production traffic secure by default.
-    -->
+
+    <!-- Base config: trust system CAs only, no cleartext for other hosts -->
     <base-config cleartextTrafficPermitted="false">
         <trust-anchors>
             <certificates src="system" />
         </trust-anchors>
     </base-config>
 
-    <!-- ── DEV ONLY: allow cleartext for local/emulator addresses ── -->
+    <!-- DEV ONLY: allow cleartext for local/emulator addresses -->
 
-    <!-- Android emulator → host machine -->
+    <!-- Android emulator to host machine -->
     <domain-config cleartextTrafficPermitted="true">
         <domain includeSubdomains="false">10.0.2.2</domain>
     </domain-config>
 
-    <!-- Genymotion emulator → host machine -->
+    <!-- Genymotion emulator to host machine -->
     <domain-config cleartextTrafficPermitted="true">
         <domain includeSubdomains="false">10.0.3.2</domain>
     </domain-config>
 
-    <!-- Local loopback (fallback) -->
+    <!-- Local loopback fallback -->
     <domain-config cleartextTrafficPermitted="true">
         <domain includeSubdomains="false">localhost</domain>
         <domain includeSubdomains="false">127.0.0.1</domain>
@@ -48,16 +33,12 @@
 
     <!--
       Physical device on same LAN as dev machine.
-      192.168.x.x covers most home/office routers.
-      For other LAN ranges, add an additional <domain-config> block.
-
-      Note: Android's network-security-config does NOT support CIDR notation.
-      We use wildcard subdomains to cover the most common ranges.
-      If your dev machine IP is outside 192.168.x.x, add it manually here
-      or use --dart-define=API_BASE_URL=http://<your-ip>:8000 with HTTPS.
+      Note: Android network-security-config does NOT support CIDR notation.
+      Add your dev machine IP manually if outside 192.168.x.x range.
     -->
     <domain-config cleartextTrafficPermitted="true">
         <!-- Matches any host ending in .local (mDNS) -->
         <domain includeSubdomains="true">.local</domain>
     </domain-config>
+
 </network-security-config>

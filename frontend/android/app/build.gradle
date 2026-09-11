@@ -1,7 +1,9 @@
 // LabelSure — Android app-level build.gradle
-apply plugin: 'com.android.application'
-apply plugin: 'kotlin-android'
-apply from: "$flutterRoot/packages/flutter_tools/gradle/flutter.gradle"
+plugins {
+    id "com.android.application"
+    id "kotlin-android"
+    id "dev.flutter.flutter-gradle-plugin"
+}
 
 // ─── Signing key configuration ────────────────────────────────────────────────
 // Reads from android/key.properties (NOT committed to git).
@@ -20,7 +22,8 @@ if (hasKeystoreFile) {
 
 android {
     namespace "com.labelsure.app"
-    compileSdkVersion 34
+    compileSdkVersion 36
+    ndkVersion "28.2.13676358"
 
     compileOptions {
         sourceCompatibility JavaVersion.VERSION_1_8
@@ -39,11 +42,11 @@ android {
         applicationId "com.labelsure.app"
 
         // minSdk 21: satisfies image_picker, camera, flutter_secure_storage
-        minSdkVersion 21
+        minSdkVersion flutter.minSdkVersion
         targetSdkVersion 34
 
-        versionCode flutterVersionCode.toInteger()
-        versionName flutterVersionName
+        versionCode flutter.versionCode
+        versionName flutter.versionName
     }
 
     // ─── Signing configs ──────────────────────────────────────────────────────
@@ -67,17 +70,12 @@ android {
                 storeFile file(System.env.KEYSTORE_FILE)
                 storePassword System.env.KEYSTORE_PASSWORD
             } else {
-                // Fallback for local dev: use debug keystore so gradle doesn't fail.
-                // ⚠️  A release APK signed with the debug keystore cannot be uploaded
-                //    to the Play Store — it is ONLY suitable for direct sideloading.
-                logger.warn(
-                    "\n[LabelSure] WARNING: No key.properties or KEYSTORE_FILE env var found.\n" +
-                    "  Release build will be signed with the DEBUG keystore.\n" +
-                    "  This is fine for direct sideloading / hackathon demo.\n" +
-                    "  For Play Store submission, set up key.properties first.\n" +
-                    "  See DEPLOYMENT.md → 'Android Signing'.\n"
-                )
-                signingConfig signingConfigs.debug
+                // Fallback: use debug keystore credentials directly (AGP 8.6+ compatible)
+                // ⚠️  Only suitable for sideloading/hackathon demo — not Play Store.
+                keyAlias "AndroidDebugKey"
+                keyPassword "android"
+                storeFile file(System.getProperty("user.home") + "/.android/debug.keystore")
+                storePassword "android"
             }
         }
     }
@@ -91,13 +89,13 @@ android {
         }
 
         release {
+            // Uses release signingConfig above; falls back to debug keystore if no key.properties.
             signingConfig signingConfigs.release
             minifyEnabled true        // Enable R8 code shrinking
             shrinkResources true      // Remove unused resources
             proguardFiles getDefaultProguardFile('proguard-android-optimize.txt'), 'proguard-rules.pro'
 
             // ⚠️  API_BASE_URL MUST be passed at build time via --dart-define.
-            // The app will crash with a clear error at startup if not set.
             // Example:
             //   flutter build apk --release \
             //     --dart-define=API_BASE_URL=https://api.labelsure.app
@@ -114,5 +112,5 @@ flutter {
 }
 
 dependencies {
-    implementation "org.jetbrains.kotlin:kotlin-stdlib-jdk7:$kotlin_version"
+    implementation "org.jetbrains.kotlin:kotlin-stdlib-jdk7:2.1.0"
 }

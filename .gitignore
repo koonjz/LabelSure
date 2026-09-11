@@ -59,6 +59,8 @@ web_dashboard/.env.local
 
 # ─── OS ──────────────────────────────────────────────────────────────────────
 .DS_Store
+._*
+._.DS_Store
 Thumbs.db
 desktop.ini
 

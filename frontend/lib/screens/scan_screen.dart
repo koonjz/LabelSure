@@ -26,7 +26,6 @@ class _ScanScreenState extends State<ScanScreen> with SingleTickerProviderStateM
   String? _error;
 
   // Optional fields
-  double? _salePrice;
   String _fontType = 'printed';
   final _salePriceCtrl = TextEditingController();
 
@@ -157,7 +156,7 @@ class _ScanScreenState extends State<ScanScreen> with SingleTickerProviderStateM
                         Text(
                           'Hello, ${auth.user?.displayName ?? 'User'}',
                           style: TextStyle(
-                            color: Colors.white.withOpacity(0.5),
+                            color: Colors.white.withValues(alpha: 0.5),
                             fontSize: 13,
                           ),
                         ),
@@ -167,7 +166,7 @@ class _ScanScreenState extends State<ScanScreen> with SingleTickerProviderStateM
                   Container(
                     padding: const EdgeInsets.all(10),
                     decoration: BoxDecoration(
-                      color: Colors.white.withOpacity(0.08),
+                      color: Colors.white.withValues(alpha: 0.08),
                       borderRadius: BorderRadius.circular(12),
                     ),
                     child: const Icon(
@@ -220,7 +219,7 @@ class _ScanScreenState extends State<ScanScreen> with SingleTickerProviderStateM
                               width: 72,
                               height: 72,
                               decoration: BoxDecoration(
-                                color: const Color(0xFF3B82F6).withOpacity(0.15),
+                                color: const Color(0xFF3B82F6).withValues(alpha: 0.15),
                                 shape: BoxShape.circle,
                               ),
                               child: const Icon(
@@ -242,7 +241,7 @@ class _ScanScreenState extends State<ScanScreen> with SingleTickerProviderStateM
                             Text(
                               'Camera or Gallery',
                               style: TextStyle(
-                                color: Colors.white.withOpacity(0.4),
+                                color: Colors.white.withValues(alpha: 0.4),
                                 fontSize: 13,
                               ),
                             ),
@@ -308,9 +307,9 @@ class _ScanScreenState extends State<ScanScreen> with SingleTickerProviderStateM
                 Container(
                   padding: const EdgeInsets.all(12),
                   decoration: BoxDecoration(
-                    color: const Color(0xFFEF4444).withOpacity(0.1),
+                    color: const Color(0xFFEF4444).withValues(alpha: 0.1),
                     borderRadius: BorderRadius.circular(10),
-                    border: Border.all(color: const Color(0xFFEF4444).withOpacity(0.3)),
+                    border: Border.all(color: const Color(0xFFEF4444).withValues(alpha: 0.3)),
                   ),
                   child: Row(
                     children: [
@@ -360,13 +359,13 @@ class _ScanScreenState extends State<ScanScreen> with SingleTickerProviderStateM
               leading: Container(
                 padding: const EdgeInsets.all(10),
                 decoration: BoxDecoration(
-                  color: const Color(0xFF3B82F6).withOpacity(0.15),
+                  color: const Color(0xFF3B82F6).withValues(alpha: 0.15),
                   borderRadius: BorderRadius.circular(10),
                 ),
                 child: const Icon(Icons.camera_alt_rounded, color: Color(0xFF3B82F6)),
               ),
               title: const Text('Camera', style: TextStyle(color: Colors.white)),
-              subtitle: Text('Take a new photo', style: TextStyle(color: Colors.white54)),
+              subtitle: const Text('Take a new photo', style: TextStyle(color: Colors.white54)),
               onTap: () {
                 Navigator.pop(context);
                 _pickImage(ImageSource.camera);
@@ -376,13 +375,13 @@ class _ScanScreenState extends State<ScanScreen> with SingleTickerProviderStateM
               leading: Container(
                 padding: const EdgeInsets.all(10),
                 decoration: BoxDecoration(
-                  color: const Color(0xFF8B5CF6).withOpacity(0.15),
+                  color: const Color(0xFF8B5CF6).withValues(alpha: 0.15),
                   borderRadius: BorderRadius.circular(10),
                 ),
                 child: const Icon(Icons.photo_library_rounded, color: Color(0xFF8B5CF6)),
               ),
               title: const Text('Gallery', style: TextStyle(color: Colors.white)),
-              subtitle: Text('Choose existing photo', style: TextStyle(color: Colors.white54)),
+              subtitle: const Text('Choose existing photo', style: TextStyle(color: Colors.white54)),
               onTap: () {
                 Navigator.pop(context);
                 _pickImage(ImageSource.gallery);
@@ -422,7 +421,7 @@ class _GradientButton extends StatelessWidget {
           borderRadius: BorderRadius.circular(14),
           boxShadow: [
             BoxShadow(
-              color: const Color(0xFF3B82F6).withOpacity(0.3),
+              color: const Color(0xFF3B82F6).withValues(alpha: 0.3),
               blurRadius: 12,
               offset: const Offset(0, 4),
             ),
@@ -472,7 +471,7 @@ class _OutlineButton extends StatelessWidget {
         onPressed: onTap,
         style: OutlinedButton.styleFrom(
           foregroundColor: Colors.white,
-          side: BorderSide(color: Colors.white.withOpacity(0.2)),
+          side: BorderSide(color: Colors.white.withValues(alpha: 0.2)),
           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
         ),
         icon: Icon(icon, size: 20),
@@ -506,7 +505,7 @@ class _ExpandableOptionsState extends State<_ExpandableOptions> {
       decoration: BoxDecoration(
         color: const Color(0xFF1E293B),
         borderRadius: BorderRadius.circular(14),
-        border: Border.all(color: Colors.white.withOpacity(0.08)),
+        border: Border.all(color: Colors.white.withValues(alpha: 0.08)),
       ),
       child: Column(
         children: [
@@ -534,14 +533,14 @@ class _ExpandableOptionsState extends State<_ExpandableOptions> {
                     style: const TextStyle(color: Colors.white),
                     decoration: InputDecoration(
                       labelText: 'Sale Price (₹) — for MRP check',
-                      labelStyle: TextStyle(color: Colors.white.withOpacity(0.5), fontSize: 13),
+                      labelStyle: TextStyle(color: Colors.white.withValues(alpha: 0.5), fontSize: 13),
                       prefixIcon: const Icon(Icons.currency_rupee, color: Colors.white38, size: 18),
                       filled: true,
-                      fillColor: Colors.white.withOpacity(0.05),
+                      fillColor: Colors.white.withValues(alpha: 0.05),
                       border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
                       enabledBorder: OutlineInputBorder(
                         borderRadius: BorderRadius.circular(10),
-                        borderSide: BorderSide(color: Colors.white.withOpacity(0.1)),
+                        borderSide: BorderSide(color: Colors.white.withValues(alpha: 0.1)),
                       ),
                       contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
                     ),
@@ -549,7 +548,7 @@ class _ExpandableOptionsState extends State<_ExpandableOptions> {
                   const SizedBox(height: 12),
                   Text(
                     'Font Type',
-                    style: TextStyle(color: Colors.white.withOpacity(0.5), fontSize: 12),
+                    style: TextStyle(color: Colors.white.withValues(alpha: 0.5), fontSize: 12),
                   ),
                   const SizedBox(height: 8),
                   Row(
@@ -596,11 +595,11 @@ class _FontTypeChip extends StatelessWidget {
         padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
         decoration: BoxDecoration(
           color: isSelected
-              ? const Color(0xFF3B82F6).withOpacity(0.2)
-              : Colors.white.withOpacity(0.05),
+              ? const Color(0xFF3B82F6).withValues(alpha: 0.2)
+              : Colors.white.withValues(alpha: 0.05),
           borderRadius: BorderRadius.circular(8),
           border: Border.all(
-            color: isSelected ? const Color(0xFF3B82F6) : Colors.white.withOpacity(0.1),
+            color: isSelected ? const Color(0xFF3B82F6) : Colors.white.withValues(alpha: 0.1),
           ),
         ),
         child: Text(
