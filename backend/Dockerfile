@@ -57,8 +57,7 @@ COPY --from=builder /install /usr/local
 COPY . .
 
 # ─── Environment defaults ────────────────────────────────────────────────────
-ENV PORT=8000 \
-    PYTHONUNBUFFERED=1 \
+ENV PYTHONUNBUFFERED=1 \
     PYTHONDONTWRITEBYTECODE=1
 
 # ─── Non-root user (security hardening) ──────────────────────────────────────

@@ -134,18 +134,16 @@ app = FastAPI(
 # Wildcard "*" is only accepted when DEBUG=true.
 # ─────────────────────────────────────────────────────────────────────────────
 _origins = settings.cors_origins_list
-if "*" in _origins and not settings.debug:
-    logger.warning(
-        "CORS_ORIGINS is '*' but DEBUG=false. "
-        "Set CORS_ORIGINS to your actual frontend domain(s) in production."
-    )
+if "*" in _origins or not _origins:
+    _origins = ["*"]
 
 app.add_middleware(
     CORSMiddleware,
     allow_origins=_origins,
+    allow_origin_regex=r"https://.*\.vercel\.app|https://.*\.onrender\.com|http://localhost:.*|http://127\.0\.0\.1:.*",
     allow_credentials=True,
-    allow_methods=["GET", "POST", "PUT", "DELETE", "OPTIONS"],
-    allow_headers=["Authorization", "Content-Type", "Accept"],
+    allow_methods=["*"],
+    allow_headers=["*"],
 )
 
 

@@ -48,8 +48,7 @@ COPY --from=builder /install /usr/local
 
 COPY . .
 
-ENV PORT=8000 \
-    PYTHONUNBUFFERED=1 \
+ENV PYTHONUNBUFFERED=1 \
     PYTHONDONTWRITEBYTECODE=1
 
 RUN useradd --no-create-home --shell /bin/false appuser \
