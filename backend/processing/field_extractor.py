@@ -30,20 +30,25 @@ _MRP_PATTERN = re.compile(
 )
 
 # Net quantity patterns:
-# Labelled:   "Net Wt. 500g", "Net Weight: 35g", "Net Contents 1 kg"
-# Standalone: "500 ml", "1.5L"
-_NET_QTY_PATTERN = re.compile(
-    r"(?:Net\s+(?:Wt\.?|Weight|Contents?|Quantity|Vol\.?|Volume|Qty\.?)[\s:]*"
-    r"|NET\s+(?:WT\.?|WEIGHT|CONTENTS?|QUANTITY|VOL\.?|VOLUME|QTY\.?)[\s:]*)?"
+# Priority 1: Explicit labelled declaration (e.g. "Net Weight : 250 Gm", "Net Wt. 500g")
+_LABELLED_NET_QTY_PATTERN = re.compile(
+    r"(?:Net\s+(?:Wt\.?|Weight|Contents?|Quantity|Vol\.?|Volume|Qty\.?)"
+    r"|NET\s+(?:WT\.?|WEIGHT|CONTENTS?|QUANTITY|VOL\.?|VOLUME|QTY\.?))[\s:]*"
     r"(\d+(?:[.,]\d+)?)\s*"
-    r"(g(?:m(?:s)?)?|kg(?:s)?|ml|millilitre|l(?:tr?(?:e)?)?|litre|liter|pcs?|nos?|pieces?|number)",
+    r"(g(?:m(?:s)?)?|kg(?:s)?|ml|millilitre|l(?:tr?(?:e)?)?|litre|liter|pcs?|nos?|pieces?|number)\b",
+    re.IGNORECASE,
+)
+
+# Priority 2: Standalone declaration (fallback)
+_STANDALONE_NET_QTY_PATTERN = re.compile(
+    r"(\d+(?:[.,]\d+)?)\s*"
+    r"(g(?:m(?:s)?)?|kg(?:s)?|ml|millilitre|l(?:tr?(?:e)?)?|litre|liter|pcs?|nos?|pieces?|number)\b",
     re.IGNORECASE,
 )
 
 # Manufacture/Packing date patterns:
-#   "Mfg. Date: 06/2023", "Date of Mfg: Jun 2023", "MFD: 2023-06"
-#   "PKD./ USE BY DATE: 30.07.22", "Packed On: 01/22", "PKD: 07/2022"
-# Also handles dual-date format: "30.07.22/29.01.23" — takes the FIRST date as manufacture.
+#   "Packed On : 09/05/2025", "Mfg. Date: 06/2023", "Date of Mfg: Jun 2023", "MFD: 2023-06"
+#   "PKD./ USE BY DATE: 30.07.22/29.01.23", "Packed On: 01/22", "PKD: 07/2022"
 _MFG_DATE_PATTERN = re.compile(
     r"(?:"
     r"Mfg\.?\s*(?:Date|Dt)?\.?"
@@ -56,11 +61,12 @@ _MFG_DATE_PATTERN = re.compile(
     r"|Packing\s+Date"
     r")[:\s]*"
     r"(?:"
-    r"(\d{1,2})[/\-.](\d{4})"               # group 1,2: DD/YYYY or MM/YYYY  (4-digit year)
-    r"|(\d{4})[/\-.](\d{1,2})"               # group 3,4: YYYY/MM
-    r"|([A-Za-z]{3,9})[\s,]+(\d{4})"         # group 5,6: Mon YYYY
-    r"|(\d{1,2})[/\-.](\d{1,2})[/\-.](\d{2})" # group 7,8,9: DD/MM/YY (2-digit year)
-    r"|(\d{1,2})[/\-.](\d{2})"               # group 10,11: MM/YY or DD/YY (2-digit year)
+    r"(\d{1,2})[/\-.](\d{1,2})[/\-.](\d{4})"   # group 1,2,3: DD/MM/YYYY or MM/DD/YYYY (4-digit year)
+    r"|(\d{1,2})[/\-.](\d{4})"                 # group 4,5: MM/YYYY or DD/YYYY (4-digit year)
+    r"|(\d{4})[/\-.](\d{1,2})"                 # group 6,7: YYYY/MM
+    r"|([A-Za-z]{3,9})[\s,]+(\d{4})"           # group 8,9: Mon YYYY
+    r"|(\d{1,2})[/\-.](\d{1,2})[/\-.](\d{2})"  # group 10,11,12: DD/MM/YY (2-digit year)
+    r"|(\d{1,2})[/\-.](\d{2})"                 # group 13,14: MM/YY (2-digit year)
     r")",
     re.IGNORECASE,
 )
@@ -74,7 +80,8 @@ _MONTH_NAMES = {
 # Manufacturer/Packer/Importer name: look for keywords
 _MFR_NAME_PATTERN = re.compile(
     r"(?:Manufactured\s+by|Mfg\.?\s+by|Packed\s+by|Marketed\s+by|Imported\s+by|Manufacturer)[:\s]*"
-    r"([A-Za-z0-9\s&,.\-'()/]{5,80})",
+    r"([A-Za-z0-9\s&,.\-'()/]{3,80}?)"
+    r"(?=\n\s*(?:MRP|Net|Batch|PKD|Packed|Best|Exp|Lic|FSSAI|Weight|Store|Customer)|$|\n\n)",
     re.IGNORECASE,
 )
 
@@ -150,7 +157,11 @@ def _extract_mrp(text: str) -> Optional[float]:
 
 
 def _extract_net_qty(text: str) -> tuple[Optional[float], Optional[str]]:
-    match = _NET_QTY_PATTERN.search(text)
+    # 1. Prefer explicit labelled declaration ("Net Weight : 250 Gm")
+    match = _LABELLED_NET_QTY_PATTERN.search(text)
+    # 2. Fall back to standalone declaration if not found
+    if not match:
+        match = _STANDALONE_NET_QTY_PATTERN.search(text)
     if match:
         raw_val = match.group(1).replace(",", ".")
         unit = match.group(2).strip().lower()
@@ -175,38 +186,41 @@ def _extract_mfg_date(text: str) -> tuple[Optional[int], Optional[int]]:
     match = _MFG_DATE_PATTERN.search(text)
     if not match:
         return None, None
-    g = match.groups()  # 11 groups total (indices 0-10)
+    g = match.groups()  # 14 groups total (indices 0-13)
     try:
-        if g[0] and g[1]:
-            # DD/YYYY or MM/YYYY  (4-digit year)
-            month_or_day = int(g[0])
-            year = int(g[1])
-            month = month_or_day if 1 <= month_or_day <= 12 else None
+        if g[0] and g[1] and g[2]:
+            # DD/MM/YYYY or MM/DD/YYYY (e.g. 09/05/2025)
+            first = int(g[0])
+            second = int(g[1])
+            year = int(g[2])
+            month = second if 1 <= second <= 12 else first
             return month, year
-        elif g[2] and g[3]:
+        elif g[3] and g[4]:
+            # MM/YYYY (4-digit year)
+            month = int(g[3])
+            year = int(g[4])
+            month = month if 1 <= month <= 12 else None
+            return month, year
+        elif g[5] and g[6]:
             # YYYY/MM
-            return int(g[3]), int(g[2])
-        elif g[4] and g[5]:
+            return int(g[6]), int(g[5])
+        elif g[7] and g[8]:
             # Mon YYYY
-            month_str = g[4][:3].lower()
+            month_str = g[7][:3].lower()
             month = _MONTH_NAMES.get(month_str)
-            return month, int(g[5])
-        elif g[6] and g[7] and g[8]:
+            return month, int(g[8])
+        elif g[9] and g[10] and g[11]:
             # DD/MM/YY — 2-digit year (e.g. 30.07.22 → July 2022)
-            day = int(g[6])
-            month = int(g[7])
-            year_2d = int(g[8])
-            # Assume 2000s for 2-digit years: 00-99 → 2000-2099
+            month = int(g[10])
+            year_2d = int(g[11])
             year = 2000 + year_2d
-            if 1 <= month <= 12:
-                return month, year
-        elif g[9] and g[10]:
+            return month if 1 <= month <= 12 else None, year
+        elif g[12] and g[13]:
             # MM/YY or DD/YY — 2-digit year (e.g. 07/22)
-            first = int(g[9])
-            year_2d = int(g[10])
+            month = int(g[12])
+            year_2d = int(g[13])
             year = 2000 + year_2d
-            month = first if 1 <= first <= 12 else None
-            return month, year
+            return month if 1 <= month <= 12 else None, year
     except (ValueError, IndexError):
         pass
     return None, None
@@ -246,3 +260,4 @@ def _extract_generic_name(text: str, mfr_name: Optional[str]) -> Optional[str]:
             continue
         return candidate
     return None
+

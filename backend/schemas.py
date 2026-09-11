@@ -5,7 +5,14 @@ Uses plain str for IDs and role/verdict so they work with SQLite String(36) colu
 from __future__ import annotations
 from datetime import datetime
 from typing import Optional, List, Literal
-from pydantic import BaseModel, EmailStr
+from pydantic import BaseModel
+
+try:
+    import email_validator
+    from pydantic import EmailStr
+except (ImportError, Exception):
+    EmailStr = str  # type: ignore
+
 
 
 # ─────────────────────────────────────────────

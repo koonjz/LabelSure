@@ -5,6 +5,9 @@ India Legal Metrology (Packaged Commodities) Rules, 2011.
 ALL numeric thresholds live here so rule updates require only this file to change.
 Version-controlled independently via backend/rules/VERSION.
 """
+from __future__ import annotations
+from typing import Optional
+
 
 # ─────────────────────────────────────────────────────────────────────────────
 # Rule 7 — Minimum Height of Letters/Numerals on Labels
@@ -62,7 +65,7 @@ UNIT_TO_GRAMS_OR_ML = {
 }
 
 
-def normalise_quantity_to_grams_or_ml(value: float, unit: str) -> float | None:
+def normalise_quantity_to_grams_or_ml(value: float, unit: str) -> Optional[float]:
     """
     Convert the declared net quantity to grams or millilitres for threshold comparison.
     Returns None if unit is non-weight/volume (e.g. pieces).

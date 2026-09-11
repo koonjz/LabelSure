@@ -141,85 +141,98 @@ async def upload_scan(
         else "NON_COMPLIANT"
     )
 
-    # Step 7: Persist
-    scan = Scan(
-        user_id=current_user.id if current_user else None,
-        image_path=str(image_path),
-        image_filename=file.filename,
-        verdict=verdict_str,
-        overall_confidence=ocr_result.min_confidence,
-        needs_manual_review=verdict.needs_manual_review,
-        review_reason=verdict.review_reason,
-        detected_language=lang_code,
-        processed_at=datetime.now(timezone.utc),
-        entered_sale_price=sale_price,
-    )
-    db.add(scan)
-    await db.flush()  # get scan.id
+    now_dt = datetime.utcnow()
 
-    field_map = {
-        "manufacturer_name": label_data.manufacturer_name,
-        "manufacturer_address": label_data.manufacturer_address,
-        "generic_name": label_data.generic_name,
-        "net_quantity_value": str(label_data.net_quantity_value) if label_data.net_quantity_value else None,
-        "net_quantity_unit": label_data.net_quantity_unit,
-        "mrp": str(label_data.mrp) if label_data.mrp else None,
-        "manufacture_month": str(label_data.manufacture_month) if label_data.manufacture_month else None,
-        "manufacture_year": str(label_data.manufacture_year) if label_data.manufacture_year else None,
-        "measured_font_height_mm": str(font_height_mm) if font_height_mm else None,
-    }
-    for fname, fval in field_map.items():
-        db.add(ExtractedField(
+    try:
+        # Step 7: Persist
+        scan = Scan(
+            user_id=current_user.id if current_user else None,
+            image_path=str(image_path),
+            image_filename=file.filename,
+            verdict=verdict_str,
+            overall_confidence=ocr_result.min_confidence,
+            needs_manual_review=verdict.needs_manual_review,
+            review_reason=verdict.review_reason,
+            detected_language=lang_code,
+            created_at=now_dt,
+            processed_at=now_dt,
+            entered_sale_price=sale_price,
+        )
+        db.add(scan)
+        await db.flush()  # get scan.id
+
+        field_map = {
+            "manufacturer_name": label_data.manufacturer_name,
+            "manufacturer_address": label_data.manufacturer_address,
+            "generic_name": label_data.generic_name,
+            "net_quantity_value": str(label_data.net_quantity_value) if label_data.net_quantity_value else None,
+            "net_quantity_unit": label_data.net_quantity_unit,
+            "mrp": str(label_data.mrp) if label_data.mrp else None,
+            "manufacture_month": str(label_data.manufacture_month) if label_data.manufacture_month else None,
+            "manufacture_year": str(label_data.manufacture_year) if label_data.manufacture_year else None,
+            "measured_font_height_mm": str(font_height_mm) if font_height_mm else None,
+        }
+        for fname, fval in field_map.items():
+            db.add(ExtractedField(
+                scan_id=scan.id,
+                field_name=fname,
+                field_value=fval,
+                confidence=ocr_result.avg_confidence,
+            ))
+
+        rule_results_out = []
+        for rr in verdict.rule_results:
+            sev = rr.severity.value if hasattr(rr.severity, "value") else str(rr.severity)
+            db.add(RuleViolation(
+                scan_id=scan.id,
+                rule_id=rr.rule_id,
+                rule_name=rr.rule_name,
+                passed=rr.passed,
+                explanation=rr.explanation,
+                severity=sev,
+            ))
+            rule_results_out.append(RuleViolationOut(
+                rule_id=rr.rule_id,
+                rule_name=rr.rule_name,
+                passed=rr.passed,
+                explanation=rr.explanation,
+                severity=sev,
+            ))
+
+        db.add(AuditLog(
             scan_id=scan.id,
-            field_name=fname,
-            field_value=fval,
-            confidence=ocr_result.avg_confidence,
+            performed_by=current_user.id if current_user else None,
+            action="SCAN_UPLOADED",
+            detail=f"Verdict: {verdict_str}",
+            timestamp=now_dt,
         ))
 
-    rule_results_out = []
-    for rr in verdict.rule_results:
-        sev = rr.severity.value if hasattr(rr.severity, "value") else str(rr.severity)
-        db.add(RuleViolation(
+        await db.commit()
+        await db.refresh(scan)
+
+        return ScanUploadResponse(
             scan_id=scan.id,
-            rule_id=rr.rule_id,
-            rule_name=rr.rule_name,
-            passed=rr.passed,
-            explanation=rr.explanation,
-            severity=sev,
-        ))
-        rule_results_out.append(RuleViolationOut(
-            rule_id=rr.rule_id,
-            rule_name=rr.rule_name,
-            passed=rr.passed,
-            explanation=rr.explanation,
-            severity=sev,
-        ))
+            verdict=verdict_str,
+            overall_confidence=ocr_result.min_confidence,
+            needs_manual_review=verdict.needs_manual_review,
+            review_reason=verdict.review_reason,
+            detected_language=lang_code,
+            extracted_fields=[
+                ExtractedFieldOut(field_name=k, field_value=v, confidence=ocr_result.avg_confidence, bounding_box=None)
+                for k, v in field_map.items() if v is not None
+            ],
+            rule_results=rule_results_out,
+            created_at=scan.created_at or now_dt,
+            processed_at=scan.processed_at or now_dt,
+        )
+    except Exception as exc:
+        await db.rollback()
+        logger.error("Failed to persist scan '%s': %s", image_path, exc, exc_info=True)
+        raise HTTPException(
+            status_code=500,
+            detail=f"Failed to process and save scan: {exc}",
+        )
 
-    db.add(AuditLog(
-        scan_id=scan.id,
-        performed_by=current_user.id if current_user else None,
-        action="SCAN_UPLOADED",
-        detail=f"Verdict: {verdict_str}",
-    ))
-
-    await db.commit()
-    await db.refresh(scan)
-
-    return ScanUploadResponse(
-        scan_id=scan.id,
-        verdict=verdict_str,
-        overall_confidence=ocr_result.min_confidence,
-        needs_manual_review=verdict.needs_manual_review,
-        review_reason=verdict.review_reason,
-        detected_language=lang_code,
-        extracted_fields=[
-            ExtractedFieldOut(field_name=k, field_value=v, confidence=ocr_result.avg_confidence, bounding_box=None)
-            for k, v in field_map.items() if v is not None
-        ],
-        rule_results=rule_results_out,
-        created_at=scan.created_at,
-        processed_at=scan.processed_at,
-    )
 
 
 # ─────────────────────────────────────────────────────────────────────────────

@@ -11,6 +11,8 @@ import logging
 import re
 import unicodedata
 
+from typing import Optional
+
 logger = logging.getLogger(__name__)
 
 try:
@@ -43,7 +45,7 @@ def _count_chars_in_range(text: str, lo: int, hi: int) -> int:
     return sum(1 for c in text if lo <= ord(c) <= hi)
 
 
-def detect_script_from_unicode(text: str) -> str | None:
+def detect_script_from_unicode(text: str) -> Optional[str]:
     """
     Detect Indic script by counting characters in Unicode ranges.
     Returns ISO-639-1 code of the dominant script, or None if not Indic.
