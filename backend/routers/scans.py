@@ -166,14 +166,18 @@ async def upload_scan(
         await db.flush()  # get scan.id
 
         field_map = {
+            "generic_name": label_data.generic_name,
             "manufacturer_name": label_data.manufacturer_name,
             "manufacturer_address": label_data.manufacturer_address,
-            "generic_name": label_data.generic_name,
             "net_quantity_value": str(label_data.net_quantity_value) if label_data.net_quantity_value else None,
             "net_quantity_unit": label_data.net_quantity_unit,
             "mrp": str(label_data.mrp) if label_data.mrp else None,
             "manufacture_month": str(label_data.manufacture_month) if label_data.manufacture_month else None,
             "manufacture_year": str(label_data.manufacture_year) if label_data.manufacture_year else None,
+            "batch_number": label_data.batch_number,
+            "expiry_date": label_data.expiry_date,
+            "fssai_license": label_data.fssai_license,
+            "consumer_care": label_data.consumer_care,
             "measured_font_height_mm": str(font_height_mm) if font_height_mm else None,
         }
         for fname, fval in field_map.items():

@@ -45,6 +45,12 @@ class LabelData:
     manufacture_month: Optional[int] = None       # 1–12
     manufacture_year: Optional[int] = None        # e.g. 2023
 
+    # Additional standard food label declarations
+    batch_number: Optional[str] = None
+    expiry_date: Optional[str] = None
+    fssai_license: Optional[str] = None
+    consumer_care: Optional[str] = None
+
     # Rule 7 — font geometry (measured by CV engine)
     measured_font_height_mm: Optional[float] = None  # min measured height of MRP/qty numerals
     font_type: str = "printed"                   # "printed" | "embossed"
@@ -55,6 +61,7 @@ class LabelData:
     # Meta
     overall_ocr_confidence: float = 1.0
     detected_language: Optional[str] = None
+
 
 
 @dataclass

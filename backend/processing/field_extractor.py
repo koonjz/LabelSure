@@ -98,24 +98,62 @@ _MONTH_NAMES = {
 
 # Manufacturer/Packer/Importer name: look for keywords
 _MFR_NAME_PATTERN = re.compile(
-    r"(?:Manufactured\s+by|Mfg\.?\s+by|Packed\s+by|Marketed\s+by|Imported\s+by|Manufacturer)[:\s]*"
+    r"(?:Manufactured\s+(?:and\s+Marketed\s+)?by|Mfg\.?\s*(?:&|and)?\s*(?:Pkd\.?)?\s*by|Packed\s+by|Pkd\.?\s+by|Marketed\s+by|Mkt\.?\s+by|Imported\s+by|Manufacturer|Producer|Packer)[:\s]*"
     r"([A-Za-z0-9\s&,.\-'()/]{3,80}?)"
-    r"(?=\n\s*(?:MRP|Net|Batch|PKD|Packed|Best|Exp|Lic|FSSAI|Weight|Store|Customer)|$|\n\n)",
+    r"(?=\n\s*(?:MRP|Net|Batch|LOT|PKD|Packed|Best|Exp|Lic|FSSAI|Weight|Store|Customer|Consumer|Address|Email|Plot)|$|\n\n)",
     re.IGNORECASE,
 )
 
-# Address pattern: look for pin code as anchor
-_ADDRESS_PATTERN = re.compile(
-    r"([A-Za-z0-9\s,.\-/]{10,150})\s*[-,]?\s*(?:Pin|PIN)?\s*(\d{6})",
+# Address pattern: PIN code anchor OR address keywords
+_ADDRESS_PIN_PATTERN = re.compile(
+    r"([A-Za-z0-9\s,.\-/]{10,150})\s*[-,]?\s*(?:Pin|PIN)?\s*(\d{6})\b",
     re.IGNORECASE,
 )
 
-# Generic / common name — typically the largest text on the label (product name)
-# We approximate by taking the longest all-caps sequence or sentence before other fields
-_GENERIC_NAME_PATTERN = re.compile(
-    r"^([A-Z][A-Z\s\-&']{4,60})$",
-    re.MULTILINE,
+_ADDRESS_KEYWORD_PATTERN = re.compile(
+    r"(?:Address|Regd\.?\s*Office|Factory|Unit|Works|Plot|Mfg\.?\s*at|Packed\s*at)[:\s\-._]*"
+    r"([A-Za-z0-9\s,.\-/]{8,120}?)"
+    r"(?=\n\s*(?:MRP|Net|Batch|LOT|PKD|Packed|Best|Exp|Lic|FSSAI|Weight|Store|Customer|Consumer)|$|\n\n)",
+    re.IGNORECASE,
 )
+
+# Batch / Lot No.
+_BATCH_PATTERN = re.compile(
+    r"(?:Batch\s*(?:No\.?|Number)?|LOT\s*(?:No\.?|Number)?|B\.?\s*No\.?)[:\s\-._]*"
+    r"([A-Za-z0-9/\-_]{3,30})",
+    re.IGNORECASE,
+)
+
+# Best Before / Expiry
+_EXPIRY_PATTERN = re.compile(
+    r"(?:Best\s+Before|Use\s+By\s+Date|Use\s+By|Expiry\s+Date|Exp\.?\s*Date|Exp\.?)[:\s\-._]*"
+    r"([A-Za-z0-9\s/\-.,]{3,50}?)"
+    r"(?=\n\s*(?:MRP|Net|Batch|LOT|PKD|Packed|fssai|Lic|Store|Customer|Mfg)|$|\n\n)",
+    re.IGNORECASE,
+)
+
+# FSSAI License Number
+_FSSAI_PATTERN = re.compile(
+    r"(?:fssai|FSSAI)[\s\w.]*(?:Lic\.?\s*(?:No\.?)?|License\s*(?:No\.?)?)?[:\s\-._]*"
+    r"([A-Za-z0-9\s]{3,30}?)"
+    r"(?=\n\s*(?:MRP|Net|Batch|LOT|PKD|Packed|Best|Store|Customer|Mfg)|$|\n\n)",
+    re.IGNORECASE,
+)
+
+# Consumer Care / Helpline / Email
+_CONSUMER_CARE_PATTERN = re.compile(
+    r"(?:Consumer\s*Care|Customer\s*Care|Helpline|Toll\s*Free|Feedback|For\s*Feedback)[:\s\-._]*"
+    r"([A-Za-z0-9@.\s\-_+()]{5,80}?)"
+    r"(?=\n\s*(?:MRP|Net|Batch|LOT|PKD|Packed|Best|fssai|Mfg)|$|\n\n)",
+    re.IGNORECASE,
+)
+
+_IGNORED_PRODUCT_KEYWORDS = {
+    "nutrition", "nutritional", "ingredients", "net weight", "net wt", "mrp", "batch",
+    "packed on", "mfg date", "best before", "fssai", "store in", "calories", "keep in",
+    "customer care", "consumer care", "marketed by", "manufactured by", "packed by",
+    "serving size", "approx", "coocking", "cooking", "lic no", "lot no", "pkd",
+}
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -142,6 +180,10 @@ def extract_fields(ocr_result: OCRResult, lang_code: str = "en") -> LabelData:
     mfr_name = _extract_manufacturer_name(text)
     mfr_addr = _extract_manufacturer_address(text)
     generic_name = _extract_generic_name(text, mfr_name)
+    batch_no = _extract_batch_number(text)
+    expiry = _extract_expiry(text)
+    fssai = _extract_fssai(text)
+    consumer_care = _extract_consumer_care(text)
 
     return LabelData(
         manufacturer_name=mfr_name,
@@ -152,6 +194,10 @@ def extract_fields(ocr_result: OCRResult, lang_code: str = "en") -> LabelData:
         mrp=mrp,
         manufacture_month=mfg_month,
         manufacture_year=mfg_year,
+        batch_number=batch_no,
+        expiry_date=expiry,
+        fssai_license=fssai,
+        consumer_care=consumer_care,
         overall_ocr_confidence=confidence,
         detected_language=lang_code,
         # CV geometry values are injected later by the processing pipeline
@@ -264,28 +310,63 @@ def _extract_manufacturer_name(text: str) -> Optional[str]:
 
 
 def _extract_manufacturer_address(text: str) -> Optional[str]:
-    match = _ADDRESS_PATTERN.search(text)
+    match = _ADDRESS_PIN_PATTERN.search(text)
     if match:
         addr = match.group(1).strip().rstrip(",.")
         pin = match.group(2)
         return f"{addr} - {pin}"
+    match_kw = _ADDRESS_KEYWORD_PATTERN.search(text)
+    if match_kw:
+        addr_kw = match_kw.group(1).strip().rstrip(",.")
+        if len(addr_kw) >= 5:
+            return addr_kw
     return None
 
 
 def _extract_generic_name(text: str, mfr_name: Optional[str]) -> Optional[str]:
     """
-    Heuristic: the generic/product name is often the first prominent ALL-CAPS
-    line that is not the manufacturer's name.
+    Extract product / commodity name:
+    Looks for the top non-noise line describing the product.
     """
-    candidates = _GENERIC_NAME_PATTERN.findall(text)
-    for candidate in candidates:
-        candidate = candidate.strip()
-        # Skip if it looks like the manufacturer name
-        if mfr_name and candidate.lower() in mfr_name.lower():
+    lines = [l.strip() for l in text.split("\n") if l.strip()]
+    for line in lines:
+        if len(line) < 3 or len(line) > 60:
             continue
-        # Skip very short candidates (likely OCR noise)
-        if len(candidate) < 5:
+        line_lower = line.lower()
+        if mfr_name and line_lower in mfr_name.lower():
             continue
-        return candidate
+        if any(kw in line_lower for kw in _IGNORED_PRODUCT_KEYWORDS):
+            continue
+        if re.match(r"^[A-Za-z0-9\s\-&']+$", line):
+            return line
     return None
+
+
+def _extract_batch_number(text: str) -> Optional[str]:
+    match = _BATCH_PATTERN.search(text)
+    if match:
+        return match.group(1).strip()
+    return None
+
+
+def _extract_expiry(text: str) -> Optional[str]:
+    match = _EXPIRY_PATTERN.search(text)
+    if match:
+        return match.group(1).strip().rstrip(",.")
+    return None
+
+
+def _extract_fssai(text: str) -> Optional[str]:
+    match = _FSSAI_PATTERN.search(text)
+    if match:
+        return match.group(1).strip().rstrip(",.")
+    return None
+
+
+def _extract_consumer_care(text: str) -> Optional[str]:
+    match = _CONSUMER_CARE_PATTERN.search(text)
+    if match:
+        return match.group(1).strip().rstrip(",.")
+    return None
+
 

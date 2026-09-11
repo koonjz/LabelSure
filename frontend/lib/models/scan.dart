@@ -112,14 +112,18 @@ class ExtractedField {
 
   String get displayName {
     final map = {
-      'manufacturer_name': 'Manufacturer Name',
+      'generic_name': 'Product / Commodity Name',
+      'manufacturer_name': 'Manufacturer / Packer',
       'manufacturer_address': 'Manufacturer Address',
-      'generic_name': 'Generic Name',
       'net_quantity_value': 'Net Quantity',
       'net_quantity_unit': 'Unit',
       'mrp': 'MRP (₹)',
       'manufacture_month': 'Manufacture Month',
       'manufacture_year': 'Manufacture Year',
+      'batch_number': 'Batch / Lot No.',
+      'expiry_date': 'Best Before / Expiry',
+      'fssai_license': 'FSSAI License No.',
+      'consumer_care': 'Consumer Care',
       'measured_font_height_mm': 'Font Height (mm)',
     };
     return map[fieldName] ?? fieldName;
