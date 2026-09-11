@@ -1,5 +1,6 @@
 // LabelSure — API service for web dashboard
-const BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000';
+const _rawUrl = import.meta.env.VITE_API_URL || 'http://localhost:8000';
+const BASE_URL = _rawUrl.replace(/\/+$/, '');
 
 let _token = localStorage.getItem('labelsure_token');
 

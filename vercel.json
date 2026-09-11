@@ -1,0 +1,10 @@
+{
+  "buildCommand": "cd web_dashboard && npm run build",
+  "outputDirectory": "web_dashboard/dist",
+  "rewrites": [
+    {
+      "source": "/(.*)",
+      "destination": "/index.html"
+    }
+  ]
+}
