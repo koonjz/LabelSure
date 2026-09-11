@@ -1,10 +1,19 @@
 import React, { useState, useEffect } from 'react';
-import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { api, clearToken, getToken } from './services/api';
 import Login from './pages/Login';
 import Dashboard from './pages/Dashboard';
+import Analytics from './pages/Analytics';
+import Users from './pages/Users';
+import Settings from './pages/Settings';
 
-function Sidebar({ user, onLogout }) {
+function Sidebar({ user, activeTab, onTabChange, onLogout }) {
+  const navItems = [
+    { id: 'dashboard', label: 'Dashboard', icon: '📊' },
+    { id: 'analytics', label: 'Analytics', icon: '📈' },
+    { id: 'users', label: 'Users', icon: '👥' },
+    { id: 'settings', label: 'Settings', icon: '⚙️' },
+  ];
+
   return (
     <div className="sidebar">
       <div className="sidebar-logo">
@@ -15,22 +24,31 @@ function Sidebar({ user, onLogout }) {
         </div>
       </div>
       <nav className="sidebar-nav">
-        <a className="nav-item active" href="#">
-          <span className="nav-icon">📊</span>
-          <span>Dashboard</span>
-        </a>
-        <a className="nav-item" href="#" style={{ opacity: 0.5, cursor: 'not-allowed' }}>
-          <span className="nav-icon">📈</span>
-          <span>Analytics</span>
-        </a>
-        <a className="nav-item" href="#" style={{ opacity: 0.5, cursor: 'not-allowed' }}>
-          <span className="nav-icon">👥</span>
-          <span>Users</span>
-        </a>
-        <a className="nav-item" href="#" style={{ opacity: 0.5, cursor: 'not-allowed' }}>
-          <span className="nav-icon">⚙️</span>
-          <span>Settings</span>
-        </a>
+        {navItems.map(item => (
+          <button
+            key={item.id}
+            className={`nav-item ${activeTab === item.id ? 'active' : ''}`}
+            onClick={() => onTabChange(item.id)}
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: 12,
+              width: '100%',
+              padding: '12px 16px',
+              border: 'none',
+              borderRadius: 8,
+              background: activeTab === item.id ? 'rgba(59,130,246,0.15)' : 'transparent',
+              color: activeTab === item.id ? '#60A5FA' : 'var(--text-muted)',
+              fontWeight: activeTab === item.id ? 700 : 500,
+              cursor: 'pointer',
+              marginBottom: 4,
+              textAlign: 'left'
+            }}
+          >
+            <span className="nav-icon">{item.icon}</span>
+            <span>{item.label}</span>
+          </button>
+        ))}
       </nav>
       <div className="sidebar-footer">
         <div className="user-info">
@@ -51,6 +69,7 @@ function Sidebar({ user, onLogout }) {
 function App() {
   const [user, setUser] = useState(null);
   const [loading, setLoading] = useState(true);
+  const [activeTab, setActiveTab] = useState('dashboard');
 
   useEffect(() => {
     if (getToken()) {
@@ -65,6 +84,7 @@ function App() {
 
   function handleLogin(u) {
     setUser(u);
+    setActiveTab('dashboard');
   }
 
   function handleLogout() {
@@ -86,9 +106,12 @@ function App() {
 
   return (
     <div className="app-layout">
-      <Sidebar user={user} onLogout={handleLogout} />
+      <Sidebar user={user} activeTab={activeTab} onTabChange={setActiveTab} onLogout={handleLogout} />
       <main className="main-content">
-        <Dashboard user={user} />
+        {activeTab === 'dashboard' && <Dashboard user={user} />}
+        {activeTab === 'analytics' && <Analytics />}
+        {activeTab === 'users' && <Users />}
+        {activeTab === 'settings' && <Settings user={user} />}
       </main>
     </div>
   );

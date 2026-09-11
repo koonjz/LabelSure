@@ -39,6 +39,16 @@ export const api = {
 
   getMe: () => request('/auth/me'),
 
+  listUsers: () => request('/auth/users'),
+
+  registerUser: (userData) =>
+    request('/auth/register', {
+      method: 'POST',
+      body: JSON.stringify(userData),
+    }),
+
+  getHealth: () => request('/health'),
+
   listScans: ({ verdict, page = 1, pageSize = 20 } = {}) => {
     const params = new URLSearchParams({ page, page_size: pageSize });
     if (verdict) params.set('verdict', verdict);

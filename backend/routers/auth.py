@@ -62,3 +62,13 @@ async def login(payload: UserLogin, db: AsyncSession = Depends(get_db)):
 async def get_me(current_user: User = Depends(get_current_user)):
     """Return the currently authenticated user's profile."""
     return current_user
+
+
+@router.get("/users", response_model=list[UserOut])
+async def list_users(
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """List all registered users (officers/admins)."""
+    result = await db.execute(select(User).order_by(User.created_at.desc()))
+    return result.scalars().all()
