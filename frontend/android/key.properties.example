@@ -1,0 +1,19 @@
+# LabelSure — Android Release Signing Key Configuration
+#
+# Copy this file to android/key.properties (NOT android/app/key.properties)
+# and fill in the values for your keystore.
+#
+# ⚠️  key.properties is in .gitignore — NEVER commit it.
+#    Only this example file is committed.
+#
+# To generate a keystore, see DEPLOYMENT.md → "Android Signing".
+# Quick command:
+#   keytool -genkey -v \
+#     -keystore labelsure-release.jks \
+#     -keyalg RSA -keysize 2048 -validity 10000 \
+#     -alias labelsure
+
+storePassword=YOUR_KEYSTORE_PASSWORD
+keyPassword=YOUR_KEY_PASSWORD
+keyAlias=labelsure
+storeFile=../labelsure-release.jks

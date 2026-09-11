@@ -3,6 +3,21 @@ apply plugin: 'com.android.application'
 apply plugin: 'kotlin-android'
 apply from: "$flutterRoot/packages/flutter_tools/gradle/flutter.gradle"
 
+// ─── Signing key configuration ────────────────────────────────────────────────
+// Reads from android/key.properties (NOT committed to git).
+// For local dev, release builds fall back to the debug keystore.
+// For CI/CD and production, set these via environment variables instead:
+//   KEYSTORE_FILE, KEYSTORE_PASSWORD, KEY_ALIAS, KEY_PASSWORD
+// See DEPLOYMENT.md → "Android Signing" for full instructions.
+def keystorePropertiesFile = rootProject.file("key.properties")
+def keystoreProperties = new Properties()
+def hasKeystoreFile = keystorePropertiesFile.exists()
+if (hasKeystoreFile) {
+    keystorePropertiesFile.withReader('UTF-8') { reader ->
+        keystoreProperties.load(reader)
+    }
+}
+
 android {
     namespace "com.labelsure.app"
     compileSdkVersion 34
@@ -23,29 +38,69 @@ android {
     defaultConfig {
         applicationId "com.labelsure.app"
 
-        // minSdk 21 satisfies image_picker (≥21), camera (≥21), flutter_secure_storage (≥18)
-        // READ_MEDIA_IMAGES is declared for API 33+ with maxSdkVersion guard for older versions.
+        // minSdk 21: satisfies image_picker, camera, flutter_secure_storage
         minSdkVersion 21
         targetSdkVersion 34
 
         versionCode flutterVersionCode.toInteger()
         versionName flutterVersionName
-
-        // Pass --dart-define value through to native build metadata (optional but useful for CI)
-        // Access via: BuildConfig.API_BASE_URL
-        def apiBaseUrl = project.findProperty('dart-define.API_BASE_URL') ?: 'http://10.0.2.2:8000'
-        buildConfigField "String", "API_BASE_URL", "\"${apiBaseUrl}\""
     }
 
+    // ─── Signing configs ──────────────────────────────────────────────────────
+    signingConfigs {
+        debug {
+            // Uses the default Android debug keystore (~/.android/debug.keystore)
+            // No configuration needed — Android Studio handles this automatically.
+        }
+
+        release {
+            if (hasKeystoreFile) {
+                // Local signing via key.properties (for direct APK distribution)
+                keyAlias keystoreProperties['keyAlias']
+                keyPassword keystoreProperties['keyPassword']
+                storeFile file(keystoreProperties['storeFile'])
+                storePassword keystoreProperties['storePassword']
+            } else if (System.env.KEYSTORE_FILE) {
+                // CI/CD signing via environment variables (e.g. GitHub Actions)
+                keyAlias System.env.KEY_ALIAS
+                keyPassword System.env.KEY_PASSWORD
+                storeFile file(System.env.KEYSTORE_FILE)
+                storePassword System.env.KEYSTORE_PASSWORD
+            } else {
+                // Fallback for local dev: use debug keystore so gradle doesn't fail.
+                // ⚠️  A release APK signed with the debug keystore cannot be uploaded
+                //    to the Play Store — it is ONLY suitable for direct sideloading.
+                logger.warn(
+                    "\n[LabelSure] WARNING: No key.properties or KEYSTORE_FILE env var found.\n" +
+                    "  Release build will be signed with the DEBUG keystore.\n" +
+                    "  This is fine for direct sideloading / hackathon demo.\n" +
+                    "  For Play Store submission, set up key.properties first.\n" +
+                    "  See DEPLOYMENT.md → 'Android Signing'.\n"
+                )
+                signingConfig signingConfigs.debug
+            }
+        }
+    }
+
+    // ─── Build types ──────────────────────────────────────────────────────────
     buildTypes {
         debug {
-            // Cleartext HTTP is handled via network_security_config.xml + manifest flag
-            debuggable true
-        }
-        release {
             signingConfig signingConfigs.debug
-            minifyEnabled false
-            shrinkResources false
+            debuggable true
+            // API_BASE_URL defaults to emulator host in app_config.dart — no override needed.
+        }
+
+        release {
+            signingConfig signingConfigs.release
+            minifyEnabled true        // Enable R8 code shrinking
+            shrinkResources true      // Remove unused resources
+            proguardFiles getDefaultProguardFile('proguard-android-optimize.txt'), 'proguard-rules.pro'
+
+            // ⚠️  API_BASE_URL MUST be passed at build time via --dart-define.
+            // The app will crash with a clear error at startup if not set.
+            // Example:
+            //   flutter build apk --release \
+            //     --dart-define=API_BASE_URL=https://api.labelsure.app
         }
     }
 

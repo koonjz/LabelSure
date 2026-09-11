@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  LabelSure — Network Security Config (RELEASE)
+  Enforces HTTPS-only for all connections.
+  No cleartext traffic is allowed in release builds.
+-->
+<network-security-config>
+    <base-config cleartextTrafficPermitted="false">
+        <trust-anchors>
+            <!-- Trust system CAs only (no user-installed certs in release) -->
+            <certificates src="system" />
+        </trust-anchors>
+    </base-config>
+</network-security-config>

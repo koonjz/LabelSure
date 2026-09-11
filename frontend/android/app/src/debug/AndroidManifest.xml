@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  LabelSure — DEBUG build manifest overlay
+  Merged on top of src/main/AndroidManifest.xml for debug builds ONLY.
+
+  Adds:
+    • android:usesCleartextTraffic="true"  — allows plain HTTP to dev backend
+    • android:debuggable="true"            — enables debugging tools
+
+  These attributes are ABSENT from release builds because this file
+  only applies to the 'debug' source set.
+-->
+<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+    <application
+        android:usesCleartextTraffic="true"
+        android:debuggable="true" />
+</manifest>
