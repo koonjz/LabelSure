@@ -123,9 +123,25 @@ async def get_db() -> AsyncSession:
 
 
 async def create_tables():
-    """Create all tables on startup.
-    In production, prefer Alembic migrations over auto-create.
-    """
+    """Create all tables on startup and seed default officer account if empty."""
     async with engine.begin() as conn:
         from backend import models  # noqa: F401 – registers all models with Base
         await conn.run_sync(Base.metadata.create_all)
+
+    # Auto-seed default officer account if no users exist
+    async with AsyncSessionLocal() as session:
+        from backend.models import User
+        from backend.auth import hash_password
+        from sqlalchemy import select
+
+        result = await session.execute(select(User).limit(1))
+        if not result.scalar_one_or_none():
+            demo_officer = User(
+                email="officer@labelsure.gov.in",
+                hashed_password=hash_password("officer123"),
+                full_name="Officer Sharma",
+                role="officer",
+                region="Delhi",
+            )
+            session.add(demo_officer)
+            await session.commit()
