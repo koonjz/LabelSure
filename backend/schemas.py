@@ -1,12 +1,11 @@
 """
 LabelSure — Pydantic Schemas (API request/response models)
+Uses plain str for IDs and role/verdict so they work with SQLite String(36) columns.
 """
 from __future__ import annotations
 from datetime import datetime
-from typing import Optional, List
-from uuid import UUID
-from pydantic import BaseModel, EmailStr, field_validator
-from backend.models import UserRole, Verdict
+from typing import Optional, List, Literal
+from pydantic import BaseModel, EmailStr
 
 
 # ─────────────────────────────────────────────
@@ -16,7 +15,7 @@ class UserCreate(BaseModel):
     email: EmailStr
     password: str
     full_name: Optional[str] = None
-    role: UserRole = UserRole.consumer
+    role: str = "consumer"   # officer | admin | consumer | seller
     region: Optional[str] = None
 
 
@@ -26,10 +25,10 @@ class UserLogin(BaseModel):
 
 
 class UserOut(BaseModel):
-    id: UUID
+    id: str
     email: str
     full_name: Optional[str]
-    role: UserRole
+    role: str
     region: Optional[str]
     is_active: bool
     created_at: datetime
@@ -72,8 +71,8 @@ class RuleViolationOut(BaseModel):
 # Scans
 # ─────────────────────────────────────────────
 class ScanUploadResponse(BaseModel):
-    scan_id: UUID
-    verdict: Optional[Verdict]
+    scan_id: str
+    verdict: Optional[str]
     overall_confidence: Optional[float]
     needs_manual_review: bool
     review_reason: Optional[str]
@@ -87,21 +86,21 @@ class ScanUploadResponse(BaseModel):
 
 
 class ScanListItem(BaseModel):
-    id: UUID
-    verdict: Optional[Verdict]
+    id: str
+    verdict: Optional[str]
     needs_manual_review: bool
     detected_language: Optional[str]
     overall_confidence: Optional[float]
     image_filename: Optional[str]
     created_at: datetime
-    user_id: Optional[UUID]
+    user_id: Optional[str]
 
     model_config = {"from_attributes": True}
 
 
 class ScanDetail(BaseModel):
-    id: UUID
-    verdict: Optional[Verdict]
+    id: str
+    verdict: Optional[str]
     overall_confidence: Optional[float]
     needs_manual_review: bool
     review_reason: Optional[str]

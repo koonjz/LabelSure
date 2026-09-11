@@ -54,7 +54,7 @@ async def login(payload: UserLogin, db: AsyncSession = Depends(get_db)):
     if not user.is_active:
         raise HTTPException(status_code=403, detail="Account is deactivated.")
 
-    token = create_access_token(str(user.id), user.role.value)
+    token = create_access_token(str(user.id), user.role)
     return Token(access_token=token, user=UserOut.model_validate(user))
 
 

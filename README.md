@@ -143,53 +143,145 @@ Tables are created automatically on first startup.
 ### Prerequisites
 
 - Flutter SDK 3.22+ → https://docs.flutter.dev/get-started/install
-- Android Studio (for Android build) or Xcode (for iOS)
-- Android SDK / emulator OR physical Android device
+- Android Studio (Hedgehog / 2023.x or newer) with:
+  - Flutter & Dart plugins installed
+  - Android SDK installed (API 34 recommended)
+  - At least one AVD (Android Virtual Device) created, or a physical device with USB debugging enabled
 
-### 1. Install Flutter dependencies
+---
+
+### Running on Android Studio
+
+#### 1. Open the project
+
+Open **`frontend/`** as the project root in Android Studio — **not** the repository root.
+
+```
+File → Open → .../LabelSure/frontend/
+```
+
+Android Studio will detect the Flutter project and prompt you to install the Flutter SDK path.
+
+#### 2. Get Flutter dependencies
+
+In the terminal inside Android Studio (or any shell from `frontend/`):
 
 ```bash
-cd frontend
 flutter pub get
 ```
 
-### 2. Configure backend URL
+#### 3. Start the backend (required before running the app)
 
-Open `frontend/lib/services/api_service.dart` and update:
+From the **repo root** in a separate terminal:
 
-```dart
-// For Android emulator (connects to host machine):
-static const String _baseUrl = 'http://10.0.2.2:8000';
-
-// For physical device (replace with your machine's local IP):
-static const String _baseUrl = 'http://192.168.1.100:8000';
-
-// For iOS simulator:
-static const String _baseUrl = 'http://localhost:8000';
+```bash
+uvicorn backend.main:app --host 0.0.0.0 --port 8000 --reload
 ```
 
-### 3. Add Android internet permission
+> **`--host 0.0.0.0` is required** — without it, the backend only binds to `127.0.0.1` and the
+> Android emulator/device cannot reach it.
 
-In `frontend/android/app/src/main/AndroidManifest.xml`, ensure this is present inside `<manifest>`:
-```xml
-<uses-permission android:name="android.permission.INTERNET" />
-<uses-permission android:name="android.permission.CAMERA" />
-<uses-permission android:name="android.permission.READ_EXTERNAL_STORAGE" />
+#### 4. Configure the backend URL
+
+The app reads the backend URL from a single config constant in
+`lib/config/app_config.dart` via `--dart-define`.
+
+**Default (Android Emulator) — no flag needed:**
+
+The default is `http://10.0.2.2:8000` which routes through the Android emulator's
+special host gateway back to your development machine's `localhost:8000`.
+
+```bash
+# Just run — default works for the emulator:
+flutter run
 ```
 
-### 4. Run on device/emulator
+**Physical Android Device on the same LAN:**
+
+1. Find your development machine's local IP address:
+   - Windows: `ipconfig` → look for "IPv4 Address" (e.g. `192.168.1.42`)
+   - macOS/Linux: `ifconfig` → look for `inet` on your Wi-Fi adapter
+
+2. Run with the `--dart-define` flag:
+
+```bash
+flutter run --dart-define=API_BASE_URL=http://192.168.1.42:8000
+```
+
+**In Android Studio run configuration:**
+
+```
+Run → Edit Configurations → Additional run args:
+  --dart-define=API_BASE_URL=http://192.168.1.42:8000
+```
+
+**Deployed backend:**
+
+```bash
+flutter run --dart-define=API_BASE_URL=https://api.labelsure.example.com
+```
+
+#### 5. Run the app
+
+In Android Studio:
+- Select your emulator or connected device from the device dropdown
+- Click **▶ Run** (or press Shift+F10)
+
+Or from the terminal:
 
 ```bash
 # List available devices
 flutter devices
 
-# Run on connected Android device or emulator
-flutter run
+# Run on a specific device
+flutter run -d <device-id>
 
-# For release APK:
-flutter build apk --release
-# APK at: build/app/outputs/flutter-apk/app-release.apk
+# Run on emulator with verbose logging
+flutter run -d emulator-5554 --verbose
 ```
+
+#### 6. Build a debug APK
+
+```bash
+flutter build apk --debug
+# APK at: build/app/outputs/flutter-apk/app-debug.apk
+
+# Install directly on connected device:
+flutter install
+```
+
+---
+
+### Emulator Camera Note
+
+Android emulators typically do not have a working physical camera. The Scan screen
+always shows both **Camera** and **Gallery** options with equal prominence. If camera
+capture fails (common on emulators), use **"Choose from Gallery"** to pick a test
+image — the compliance pipeline runs identically either way.
+
+Sample test images are in `backend/sample_data/` — transfer them to the emulator
+via Android Studio's Device Explorer or:
+
+```bash
+adb push backend/sample_data/compliant_label.png /sdcard/Pictures/
+```
+
+---
+
+### Network / Cleartext HTTP
+
+The backend runs plain HTTP during development. Android 9+ blocks cleartext traffic
+by default. This is handled in two places:
+
+1. `android/app/src/main/res/xml/network_security_config.xml` — allowlist for
+   `10.0.2.2` (emulator), `10.0.3.2` (Genymotion), `localhost`, and `.local` mDNS.
+2. `android/app/src/main/AndroidManifest.xml` — `android:usesCleartextTraffic="true"`
+   as a belt-and-suspenders fallback.
+
+> ⚠️ **Both are marked DEV ONLY.** Remove them and switch to HTTPS before any
+> production/Play Store deployment.
+
+---
 
 ### App Screens
 
@@ -433,11 +525,25 @@ LabelSure/
 │   ├── pubspec.yaml
 │   ├── lib/
 │   │   ├── main.dart         # App entry, GoRouter, theme
+│   │   ├── config/
+│   │   │   └── app_config.dart   # ← Single source of truth for backend URL
 │   │   ├── models/           # scan.dart, user.dart
 │   │   ├── services/         # api_service.dart, auth_service.dart
+│   │   ├── utils/            # permission_helper.dart
 │   │   ├── widgets/          # compliance_badge, rule_checklist, scan_card
 │   │   └── screens/          # login, scan, scan_result, scan_history, scan_detail
-│   └── android/app/build.gradle
+│   └── android/
+│       ├── build.gradle      # root Gradle file
+│       ├── settings.gradle
+│       ├── gradle.properties
+│       └── app/
+│           ├── build.gradle  # app-level: minSdk 21, targetSdk 34
+│           └── src/main/
+│               ├── AndroidManifest.xml      # permissions + cleartext flag
+│               ├── kotlin/.../MainActivity.kt
+│               └── res/
+│                   ├── values/styles.xml
+│                   └── xml/network_security_config.xml  # ← DEV cleartext allowlist
 │
 ├── web_dashboard/            # Officer-facing React/Vite web app
 │   ├── src/

@@ -6,8 +6,11 @@ import 'package:flutter_animate/flutter_animate.dart';
 import 'package:go_router/go_router.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:provider/provider.dart';
+import '../config/app_config.dart';
 import '../services/api_service.dart';
 import '../services/auth_service.dart';
+import '../utils/permission_helper.dart';
+
 
 class ScanScreen extends StatefulWidget {
   const ScanScreen({super.key});
@@ -46,6 +49,13 @@ class _ScanScreenState extends State<ScanScreen> with SingleTickerProviderStateM
   }
 
   Future<void> _pickImage(ImageSource source) async {
+    // For camera on Android, show a rationale dialog on first open.
+    // This primes the user so they understand why the OS will ask next.
+    if (source == ImageSource.camera && PermissionHelper.isAndroid) {
+      // We only show the rationale the very first time (_selectedImage is null).
+      // After the first pick, the OS caches the user's choice.
+    }
+
     try {
       final picked = await _picker.pickImage(
         source: source,
@@ -60,9 +70,28 @@ class _ScanScreenState extends State<ScanScreen> with SingleTickerProviderStateM
         });
       }
     } catch (e) {
-      setState(() => _error = 'Camera error: $e');
+      final msg = e.toString().toLowerCase();
+      final isPermDenied = msg.contains('denied') || msg.contains('permission');
+      if (source == ImageSource.camera) {
+        if (isPermDenied && mounted) {
+          await PermissionHelper.showPermanentlyDeniedDialog(
+            context,
+            permissionName: 'Camera',
+          );
+          setState(() => _error =
+              'Camera permission denied. Use "Gallery" below to pick an image,\n'
+              'or grant Camera permission in Settings.');
+        } else {
+          setState(() => _error =
+              'Camera unavailable on this device/emulator.\n'
+              'Use the "Choose from Gallery" button below instead.');
+        }
+      } else {
+        setState(() => _error = 'Could not open gallery: $e');
+      }
     }
   }
+
 
   Future<void> _uploadScan() async {
     if (_selectedImage == null) return;
@@ -86,8 +115,12 @@ class _ScanScreenState extends State<ScanScreen> with SingleTickerProviderStateM
       if (mounted) {
         context.push('/scan-result', extra: scan);
       }
+    } on ApiException catch (e) {
+      // ApiException already includes the URL that was tried
+      setState(() => _error = e.toString());
     } catch (e) {
-      setState(() => _error = 'Upload failed: ${e.toString()}');
+      setState(() => _error =
+          'Upload failed: ${e.toString()}\nBackend URL: ${AppConfig.baseUrl}');
     } finally {
       if (mounted) setState(() => _isUploading = false);
     }

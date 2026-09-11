@@ -1,6 +1,7 @@
 """
 LabelSure — Database Engine
-Async SQLAlchemy engine using asyncpg.
+Supports both SQLite (dev) and PostgreSQL (production) via env-driven DATABASE_URL.
+Connection pooling is enabled automatically for PostgreSQL.
 """
 from sqlalchemy.ext.asyncio import create_async_engine, AsyncSession, async_sessionmaker
 from sqlalchemy.orm import DeclarativeBase
@@ -8,13 +9,32 @@ from backend.config import get_settings
 
 settings = get_settings()
 
-engine = create_async_engine(
-    settings.database_url,
-    echo=settings.debug,
-    pool_pre_ping=True,
-    pool_size=10,
-    max_overflow=20,
-)
+
+def _build_engine():
+    url = settings.database_url
+
+    # SQLite: no connection pooling, thread-safety override
+    if settings.is_sqlite:
+        return create_async_engine(
+            url,
+            echo=settings.debug,
+            pool_pre_ping=True,
+            connect_args={"check_same_thread": False},
+        )
+
+    # PostgreSQL (asyncpg): full connection pooling
+    return create_async_engine(
+        url,
+        echo=settings.debug,
+        pool_pre_ping=True,
+        pool_size=settings.db_pool_size,
+        max_overflow=settings.db_max_overflow,
+        pool_timeout=settings.db_pool_timeout,
+        pool_recycle=settings.db_pool_recycle,
+    )
+
+
+engine = _build_engine()
 
 AsyncSessionLocal = async_sessionmaker(
     engine,
@@ -40,7 +60,9 @@ async def get_db() -> AsyncSession:
 
 
 async def create_tables():
-    """Create all tables (used at startup in dev mode)."""
+    """Create all tables on startup.
+    In production, prefer Alembic migrations over auto-create.
+    """
     async with engine.begin() as conn:
         from backend import models  # noqa: F401 – registers all models with Base
         await conn.run_sync(Base.metadata.create_all)

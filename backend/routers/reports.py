@@ -14,7 +14,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from backend.auth import get_current_officer
 from backend.database import get_db
-from backend.models import Scan, User, UserRole, Verdict as VerdictEnum
+from backend.models import Scan, User
 
 router = APIRouter(prefix="/reports", tags=["Reports"])
 
@@ -36,10 +36,7 @@ async def export_scans(
     query = select(Scan)
 
     if verdict_filter:
-        try:
-            query = query.where(Scan.verdict == VerdictEnum(verdict_filter.upper()))
-        except ValueError:
-            pass
+        query = query.where(Scan.verdict == verdict_filter.upper())
 
     if date_from:
         try:
@@ -64,7 +61,7 @@ async def export_scans(
         data = [
             {
                 "id": str(s.id),
-                "verdict": s.verdict.value if s.verdict else None,
+                "verdict": s.verdict,
                 "needs_manual_review": s.needs_manual_review,
                 "detected_language": s.detected_language,
                 "overall_confidence": s.overall_confidence,
@@ -89,7 +86,7 @@ async def export_scans(
     for s in scans:
         writer.writerow({
             "Scan ID": str(s.id),
-            "Verdict": s.verdict.value if s.verdict else "UNKNOWN",
+            "Verdict": s.verdict or "UNKNOWN",
             "Needs Review": "Yes" if s.needs_manual_review else "No",
             "Language": s.detected_language or "en",
             "Confidence": f"{(s.overall_confidence or 0) * 100:.1f}%",

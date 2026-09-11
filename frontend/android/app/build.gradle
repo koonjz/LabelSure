@@ -1,3 +1,4 @@
+// LabelSure — Android app-level build.gradle
 apply plugin: 'com.android.application'
 apply plugin: 'kotlin-android'
 apply from: "$flutterRoot/packages/flutter_tools/gradle/flutter.gradle"
@@ -21,16 +22,35 @@ android {
 
     defaultConfig {
         applicationId "com.labelsure.app"
+
+        // minSdk 21 satisfies image_picker (≥21), camera (≥21), flutter_secure_storage (≥18)
+        // READ_MEDIA_IMAGES is declared for API 33+ with maxSdkVersion guard for older versions.
         minSdkVersion 21
         targetSdkVersion 34
+
         versionCode flutterVersionCode.toInteger()
         versionName flutterVersionName
+
+        // Pass --dart-define value through to native build metadata (optional but useful for CI)
+        // Access via: BuildConfig.API_BASE_URL
+        def apiBaseUrl = project.findProperty('dart-define.API_BASE_URL') ?: 'http://10.0.2.2:8000'
+        buildConfigField "String", "API_BASE_URL", "\"${apiBaseUrl}\""
     }
 
     buildTypes {
+        debug {
+            // Cleartext HTTP is handled via network_security_config.xml + manifest flag
+            debuggable true
+        }
         release {
             signingConfig signingConfigs.debug
+            minifyEnabled false
+            shrinkResources false
         }
+    }
+
+    buildFeatures {
+        buildConfig true
     }
 }
 

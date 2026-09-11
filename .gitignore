@@ -1,0 +1,67 @@
+# ─── Secrets — NEVER commit these ────────────────────────────────────────────
+.env
+*.env.local
+*.env.production
+
+# ─── SQLite dev database ─────────────────────────────────────────────────────
+*.db
+*.sqlite
+*.sqlite3
+
+# ─── Uploaded label images (runtime data, not source) ────────────────────────
+uploads/
+
+# ─── Python ──────────────────────────────────────────────────────────────────
+__pycache__/
+*.py[cod]
+*$py.class
+*.egg-info/
+dist/
+build/
+.eggs/
+.venv/
+venv/
+env/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+htmlcov/
+.coverage
+coverage.xml
+
+# ─── Flutter ─────────────────────────────────────────────────────────────────
+frontend/.dart_tool/
+frontend/build/
+frontend/.flutter-plugins
+frontend/.flutter-plugins-dependencies
+frontend/.pub-cache/
+frontend/.pub/
+# Android signing keystore — NEVER commit private keys
+frontend/android/app/*.jks
+frontend/android/app/*.keystore
+frontend/android/key.properties
+# local.properties has the SDK path — machine-specific
+frontend/android/local.properties
+
+# ─── Node / Web dashboard ────────────────────────────────────────────────────
+web_dashboard/node_modules/
+web_dashboard/dist/
+web_dashboard/.env
+web_dashboard/.env.local
+web_dashboard/.env.production
+
+# ─── IDE ─────────────────────────────────────────────────────────────────────
+.idea/
+.vscode/
+*.iml
+*.iws
+*.ipr
+
+# ─── OS ──────────────────────────────────────────────────────────────────────
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# ─── Docker ──────────────────────────────────────────────────────────────────
+# docker-compose.override.yml can hold local overrides (also gitignored)
+docker-compose.override.yml

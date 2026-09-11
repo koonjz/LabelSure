@@ -3,7 +3,7 @@
 import 'package:flutter/foundation.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import '../models/user.dart';
-import 'api_service.dart';
+import 'api_service.dart'; // also imports ApiException
 
 class AuthService extends ChangeNotifier {
   static const _tokenKey = 'labelsure_jwt';
@@ -100,13 +100,11 @@ class AuthService extends ChangeNotifier {
   }
 
   String _parseError(dynamic e) {
-    if (e is Exception) {
-      final msg = e.toString();
-      if (msg.contains('401')) return 'Invalid email or password.';
-      if (msg.contains('409')) return 'Email already registered.';
-      if (msg.contains('connection')) return 'Cannot connect to server.';
-      return msg;
-    }
-    return e.toString();
+    // ApiException already contains the URL tried and a human-readable message.
+    if (e is ApiException) return e.toString();
+    final msg = e.toString();
+    if (msg.contains('401')) return 'Invalid email or password.';
+    if (msg.contains('409')) return 'Email already registered.';
+    return msg;
   }
 }

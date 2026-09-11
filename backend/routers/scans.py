@@ -5,10 +5,6 @@ GET  /scans           — list scans (officers see all; consumers see own)
 GET  /scans/{scan_id} — get full scan detail including rule results
 """
 from __future__ import annotations
-import asyncio
-import json
-import os
-import shutil
 import uuid
 from datetime import datetime, timezone
 from pathlib import Path
@@ -22,18 +18,27 @@ from sqlalchemy.orm import selectinload
 from backend.auth import get_current_user, get_optional_user
 from backend.config import get_settings
 from backend.database import get_db
-from backend.models import (
-    AuditLog, ExtractedField, RuleViolation, Scan, User, UserRole, Verdict as VerdictEnum,
-)
+from backend.models import AuditLog, ExtractedField, RuleViolation, Scan, User
 from backend.processing.ocr_engine import run_ocr
 from backend.processing.cv_geometry import measure_min_font_height_mm, extract_image_dpi
 from backend.processing.nlp_lang import detect_language
 from backend.processing.field_extractor import extract_fields
 from backend.rules import evaluate_label, LabelData
-from backend.schemas import ScanDetail, ScanListItem, ScanListResponse, ScanUploadResponse
+from backend.schemas import (
+    ScanDetail, ScanListItem, ScanListResponse, ScanUploadResponse,
+    ExtractedFieldOut, RuleViolationOut,
+)
 
 router = APIRouter(prefix="/scans", tags=["Scans"])
 settings = get_settings()
+OFFICER_ROLES = ("officer", "admin")
+
+
+def _verdict_str(verdict) -> str:
+    """Convert a rules-engine Verdict to a plain string."""
+    if hasattr(verdict, "value"):
+        return verdict.value
+    return str(verdict)
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -51,18 +56,17 @@ async def upload_scan(
     current_user: Optional[User] = Depends(get_optional_user),
 ):
     """
-    Upload a product label image. The pipeline:
-    1. Save image to disk.
+    Upload a product label image. Pipeline:
+    1. Validate & save image.
     2. Run OCR (PaddleOCR → Tesseract fallback).
-    3. Detect language.
-    4. Re-run OCR with language-appropriate model if needed.
-    5. Measure font height via CV (if calibration data available).
-    6. Extract structured fields.
-    7. Run rules engine.
-    8. Persist scan + results to DB.
-    9. Return immediate verdict.
+    3. Detect language; re-run OCR with Indic model if needed.
+    4. Measure font height via CV.
+    5. Extract structured fields.
+    6. Run rules engine.
+    7. Persist results to DB.
+    8. Return verdict.
     """
-    # --- Validate file ---
+    # Validate file type
     if file.content_type not in ("image/jpeg", "image/png", "image/webp", "image/jpg"):
         raise HTTPException(400, detail="Only JPEG, PNG, or WEBP images are accepted.")
 
@@ -71,39 +75,40 @@ async def upload_scan(
     if len(content) > max_bytes:
         raise HTTPException(413, detail=f"Image exceeds {settings.max_upload_size_mb} MB limit.")
 
-    # --- Save image ---
+    # Save image
     upload_dir = Path(settings.upload_dir)
     upload_dir.mkdir(parents=True, exist_ok=True)
     file_ext = Path(file.filename or "label.jpg").suffix or ".jpg"
     filename = f"{uuid.uuid4()}{file_ext}"
     image_path = upload_dir / filename
-    with open(image_path, "wb") as f:
-        f.write(content)
+    with open(image_path, "wb") as fh:
+        fh.write(content)
 
-    # --- Step 1: Initial OCR with English model ---
+    # Step 1: OCR with English model
     try:
         ocr_result = run_ocr(str(image_path), lang_code="en")
-    except Exception as e:
-        ocr_result_empty = type("OCRResult", (), {
-            "full_text": "", "min_confidence": 0.0, "avg_confidence": 0.0,
-            "boxes": [], "engine_used": "none"
-        })()
-        ocr_result = ocr_result_empty
+    except Exception:
+        class _Empty:
+            full_text = ""
+            min_confidence = 0.0
+            avg_confidence = 0.0
+            boxes = []
+            engine_used = "none"
+        ocr_result = _Empty()
 
-    # --- Step 2: Detect language ---
+    # Step 2: Language detection
     lang_code = detect_language(ocr_result.full_text)
 
-    # --- Step 3: Re-run OCR with correct language model if non-English ---
+    # Step 3: Re-run with Indic model if needed
     if lang_code != "en":
         try:
-            ocr_result_lang = run_ocr(str(image_path), lang_code=lang_code)
-            # Use whichever result has higher confidence
-            if ocr_result_lang.min_confidence >= ocr_result.min_confidence:
-                ocr_result = ocr_result_lang
+            ocr_lang = run_ocr(str(image_path), lang_code=lang_code)
+            if ocr_lang.min_confidence >= ocr_result.min_confidence:
+                ocr_result = ocr_lang
         except Exception:
-            pass  # Keep English result
+            pass
 
-    # --- Step 4: CV font height measurement ---
+    # Step 4: CV font height
     dpi = extract_image_dpi(str(image_path))
     font_height_mm = measure_min_font_height_mm(
         str(image_path),
@@ -113,27 +118,26 @@ async def upload_scan(
         reference_width_px=reference_width_px,
     )
 
-    # --- Step 5: Extract structured fields ---
+    # Step 5: Field extraction
     label_data: LabelData = extract_fields(ocr_result, lang_code=lang_code)
     label_data.font_type = font_type
     label_data.measured_font_height_mm = font_height_mm
     label_data.entered_sale_price = sale_price
 
-    # --- Step 6: Run rules engine ---
+    # Step 6: Rules engine
     verdict = evaluate_label(label_data, ocr_confidence=ocr_result.min_confidence)
-
-    # --- Step 7: Persist to database ---
-    verdict_enum = (
-        VerdictEnum.needs_review if verdict.needs_manual_review else
-        VerdictEnum.compliant if verdict.is_compliant else
-        VerdictEnum.non_compliant
+    verdict_str = (
+        "NEEDS_REVIEW" if verdict.needs_manual_review
+        else "COMPLIANT" if verdict.is_compliant
+        else "NON_COMPLIANT"
     )
 
+    # Step 7: Persist
     scan = Scan(
         user_id=current_user.id if current_user else None,
         image_path=str(image_path),
         image_filename=file.filename,
-        verdict=verdict_enum,
+        verdict=verdict_str,
         overall_confidence=ocr_result.min_confidence,
         needs_manual_review=verdict.needs_manual_review,
         review_reason=verdict.review_reason,
@@ -144,7 +148,6 @@ async def upload_scan(
     db.add(scan)
     await db.flush()  # get scan.id
 
-    # Persist extracted fields
     field_map = {
         "manufacturer_name": label_data.manufacturer_name,
         "manufacturer_address": label_data.manufacturer_address,
@@ -157,66 +160,54 @@ async def upload_scan(
         "measured_font_height_mm": str(font_height_mm) if font_height_mm else None,
     }
     for fname, fval in field_map.items():
-        ef = ExtractedField(
+        db.add(ExtractedField(
             scan_id=scan.id,
             field_name=fname,
             field_value=fval,
             confidence=ocr_result.avg_confidence,
-        )
-        db.add(ef)
+        ))
 
-    # Persist rule results
+    rule_results_out = []
     for rr in verdict.rule_results:
-        rv = RuleViolation(
+        sev = rr.severity.value if hasattr(rr.severity, "value") else str(rr.severity)
+        db.add(RuleViolation(
             scan_id=scan.id,
             rule_id=rr.rule_id,
             rule_name=rr.rule_name,
             passed=rr.passed,
             explanation=rr.explanation,
-            severity=rr.severity.value,
-        )
-        db.add(rv)
+            severity=sev,
+        ))
+        rule_results_out.append(RuleViolationOut(
+            rule_id=rr.rule_id,
+            rule_name=rr.rule_name,
+            passed=rr.passed,
+            explanation=rr.explanation,
+            severity=sev,
+        ))
 
-    # Audit log
-    al = AuditLog(
+    db.add(AuditLog(
         scan_id=scan.id,
         performed_by=current_user.id if current_user else None,
         action="SCAN_UPLOADED",
-        detail=f"Verdict: {verdict_enum.value}",
-    )
-    db.add(al)
+        detail=f"Verdict: {verdict_str}",
+    ))
 
     await db.commit()
     await db.refresh(scan)
 
-    # --- Build response ---
-    from backend.schemas import ExtractedFieldOut, RuleViolationOut
     return ScanUploadResponse(
         scan_id=scan.id,
-        verdict=verdict_enum,
+        verdict=verdict_str,
         overall_confidence=ocr_result.min_confidence,
         needs_manual_review=verdict.needs_manual_review,
         review_reason=verdict.review_reason,
         detected_language=lang_code,
         extracted_fields=[
-            ExtractedFieldOut(
-                field_name=k,
-                field_value=v,
-                confidence=ocr_result.avg_confidence,
-                bounding_box=None,
-            )
+            ExtractedFieldOut(field_name=k, field_value=v, confidence=ocr_result.avg_confidence, bounding_box=None)
             for k, v in field_map.items() if v is not None
         ],
-        rule_results=[
-            RuleViolationOut(
-                rule_id=rr.rule_id,
-                rule_name=rr.rule_name,
-                passed=rr.passed,
-                explanation=rr.explanation,
-                severity=rr.severity.value,
-            )
-            for rr in verdict.rule_results
-        ],
+        rule_results=rule_results_out,
         created_at=scan.created_at,
         processed_at=scan.processed_at,
     )
@@ -229,35 +220,23 @@ async def upload_scan(
 @router.get("", response_model=ScanListResponse)
 async def list_scans(
     verdict_filter: Optional[str] = Query(None, alias="verdict"),
-    date_from: Optional[str] = Query(None),
-    date_to: Optional[str] = Query(None),
     page: int = Query(1, ge=1),
     page_size: int = Query(20, ge=1, le=100),
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    """
-    List scans.
-    - Officers/Admins see all scans (with optional filters).
-    - Consumers/Sellers see only their own scans.
-    """
+    """Officers/Admins see all scans; consumers/sellers see only their own."""
     query = select(Scan)
 
-    if current_user.role not in (UserRole.officer, UserRole.admin):
+    if current_user.role not in OFFICER_ROLES:
         query = query.where(Scan.user_id == current_user.id)
 
     if verdict_filter:
-        try:
-            vf = VerdictEnum(verdict_filter.upper())
-            query = query.where(Scan.verdict == vf)
-        except ValueError:
-            pass
+        query = query.where(Scan.verdict == verdict_filter.upper())
 
-    # Count total
     count_q = select(func.count()).select_from(query.subquery())
     total = (await db.execute(count_q)).scalar_one()
 
-    # Paginate
     query = query.order_by(Scan.created_at.desc()).offset((page - 1) * page_size).limit(page_size)
     result = await db.execute(query)
     scans = result.scalars().all()
@@ -281,14 +260,9 @@ async def get_scan(
     current_user: User = Depends(get_current_user),
 ):
     """Get full details for a single scan (extracted fields + rule results)."""
-    try:
-        sid = uuid.UUID(scan_id)
-    except ValueError:
-        raise HTTPException(400, detail="Invalid scan ID format.")
-
     result = await db.execute(
         select(Scan)
-        .where(Scan.id == sid)
+        .where(Scan.id == scan_id)
         .options(
             selectinload(Scan.extracted_fields),
             selectinload(Scan.rule_violations),
@@ -299,12 +273,10 @@ async def get_scan(
     if not scan:
         raise HTTPException(404, detail="Scan not found.")
 
-    # Access control: consumers/sellers can only see their own scans
-    if current_user.role not in (UserRole.officer, UserRole.admin):
+    if current_user.role not in OFFICER_ROLES:
         if scan.user_id != current_user.id:
             raise HTTPException(403, detail="Access denied.")
 
-    from backend.schemas import ExtractedFieldOut, RuleViolationOut
     return ScanDetail(
         id=scan.id,
         verdict=scan.verdict,

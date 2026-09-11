@@ -1,0 +1,84 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  LabelSure — Android Manifest
+
+  ⚠️  DEV CONFIGURATION:
+  • android:usesCleartextTraffic="true" allows plain HTTP to the local backend.
+  • android:networkSecurityConfig references the per-domain cleartext allowlist.
+  BEFORE any production/Play Store release:
+    - Remove android:usesCleartextTraffic="true"
+    - Replace the backend URL with an HTTPS endpoint
+    - Remove or tighten android/app/src/main/res/xml/network_security_config.xml
+-->
+<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+
+    <!-- ─── Permissions ─────────────────────────────────────────────────── -->
+
+    <!-- Network: required to reach the FastAPI backend -->
+    <uses-permission android:name="android.permission.INTERNET" />
+
+    <!-- Camera: for label photo capture -->
+    <uses-permission android:name="android.permission.CAMERA" />
+    <!-- Camera hardware is optional: app gracefully falls back to gallery if absent -->
+    <uses-feature android:name="android.hardware.camera" android:required="false" />
+    <uses-feature android:name="android.hardware.camera.autofocus" android:required="false" />
+
+    <!--
+      Storage / Media — image_picker requirements by Android version:
+        API 33+ (Android 13+): READ_MEDIA_IMAGES (granular)
+        API ≤32 (Android 12 and below): READ_EXTERNAL_STORAGE with maxSdkVersion guard
+    -->
+    <uses-permission android:name="android.permission.READ_MEDIA_IMAGES" />
+    <uses-permission
+        android:name="android.permission.READ_EXTERNAL_STORAGE"
+        android:maxSdkVersion="32" />
+
+    <application
+        android:label="LabelSure"
+        android:name="${applicationName}"
+        android:icon="@mipmap/ic_launcher"
+        android:usesCleartextTraffic="true"
+        android:networkSecurityConfig="@xml/network_security_config">
+
+        <activity
+            android:name=".MainActivity"
+            android:exported="true"
+            android:launchMode="singleTop"
+            android:taskAffinity=""
+            android:theme="@style/LaunchTheme"
+            android:configChanges="orientation|keyboardHidden|keyboard|screenSize|smallestScreenSize|locale|layoutDirection|fontScale|screenLayout|density|uiMode"
+            android:hardwareAccelerated="true"
+            android:windowSoftInputMode="adjustResize">
+
+            <meta-data
+                android:name="io.flutter.embedding.android.NormalTheme"
+                android:resource="@style/NormalTheme" />
+
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+        </activity>
+
+        <meta-data
+            android:name="flutterEmbedding"
+            android:value="2" />
+    </application>
+
+    <!--
+      queries block: required on Android 11+ (API 30+) for image_picker to resolve
+      implicit intents to camera and gallery apps.
+    -->
+    <queries>
+        <intent>
+            <action android:name="android.media.action.IMAGE_CAPTURE" />
+        </intent>
+        <intent>
+            <action android:name="android.intent.action.GET_CONTENT" />
+        </intent>
+        <intent>
+            <action android:name="android.intent.action.PICK" />
+            <data android:mimeType="image/*" />
+        </intent>
+    </queries>
+</manifest>

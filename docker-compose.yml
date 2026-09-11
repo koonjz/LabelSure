@@ -1,30 +1,45 @@
 version: '3.9'
 
+# ─────────────────────────────────────────────────────────────────────────────
+# LabelSure — Docker Compose
+#
+# Usage:
+#   cp .env.example .env          # fill in real secrets
+#   docker compose up -d          # start all services
+#   docker compose logs -f backend  # tail logs
+#
+# All secrets come from the .env file at the repo root.
+# NEVER commit .env with real values — only .env.example is committed.
+# ─────────────────────────────────────────────────────────────────────────────
+
 services:
-  # ─────────────────────────────────────────────
-  # PostgreSQL Database
-  # ─────────────────────────────────────────────
+
+  # ─── PostgreSQL ─────────────────────────────────────────────────────────────
   db:
     image: postgres:16-alpine
     container_name: labelsure_db
     restart: unless-stopped
     environment:
-      POSTGRES_DB: labelsure
-      POSTGRES_USER: labelsure
-      POSTGRES_PASSWORD: labelsure
+      POSTGRES_DB: ${POSTGRES_DB:-labelsure}
+      POSTGRES_USER: ${POSTGRES_USER:-labelsure}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?POSTGRES_PASSWORD must be set in .env}
     ports:
-      - "5432:5432"
+      - "${POSTGRES_PORT:-5432}:5432"
     volumes:
       - postgres_data:/var/lib/postgresql/data
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U labelsure"]
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-labelsure}"]
       interval: 10s
       timeout: 5s
       retries: 5
+    # Tune postgres for a small server (adjust for your plan)
+    command: >
+      postgres
+        -c max_connections=50
+        -c shared_buffers=128MB
+        -c effective_cache_size=256MB
 
-  # ─────────────────────────────────────────────
-  # FastAPI Backend
-  # ─────────────────────────────────────────────
+  # ─── FastAPI Backend ─────────────────────────────────────────────────────────
   backend:
     build:
       context: ./backend
@@ -35,16 +50,45 @@ services:
       db:
         condition: service_healthy
     environment:
-      DATABASE_URL: postgresql+asyncpg://labelsure:labelsure@db:5432/labelsure
-      SYNC_DATABASE_URL: postgresql://labelsure:labelsure@db:5432/labelsure
-      SECRET_KEY: ${SECRET_KEY:-changeme-in-production}
+      # Database — references the 'db' service by hostname
+      DATABASE_URL: postgresql+asyncpg://${POSTGRES_USER:-labelsure}:${POSTGRES_PASSWORD}@db:5432/${POSTGRES_DB:-labelsure}
+
+      # Security — must be set in .env, no default accepted in prod
+      SECRET_KEY: ${SECRET_KEY:?SECRET_KEY must be set in .env}
+
+      # CORS — comma-separated list of allowed frontend origins
+      # Example: https://dashboard.labelsure.app,https://labelsure.app
+      CORS_ORIGINS: ${CORS_ORIGINS:-*}
+
+      # Uploads
       UPLOAD_DIR: /app/uploads
-      DEBUG: "false"
+      MAX_UPLOAD_SIZE_MB: ${MAX_UPLOAD_SIZE_MB:-20}
+
+      # Worker count — gunicorn workers (2 per CPU core is typical)
+      WORKERS: ${WORKERS:-2}
+
+      # Logging — "json" for production log aggregators
+      LOG_FORMAT: ${LOG_FORMAT:-json}
+
+      # Debug — set to "false" in production
+      DEBUG: ${DEBUG:-false}
+
+      # JWT
+      ACCESS_TOKEN_EXPIRE_MINUTES: ${ACCESS_TOKEN_EXPIRE_MINUTES:-1440}
+
     ports:
-      - "8000:8000"
+      - "${BACKEND_PORT:-8000}:8000"
     volumes:
       - uploads_data:/app/uploads
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 20s
 
 volumes:
   postgres_data:
+    driver: local
   uploads_data:
+    driver: local
