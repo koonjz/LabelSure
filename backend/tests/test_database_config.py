@@ -32,3 +32,12 @@ def test_neon_pooled_endpoint_normalization():
     norm_url, connect_args = _get_normalized_db_url(neon_pooled_url)
     assert norm_url.startswith("postgresql+asyncpg://")
     assert connect_args.get("ssl") == "require"
+
+
+def test_neon_channel_binding_filtering():
+    neon_full_url = "postgres://alex:secret123@ep-cool-darkness-123456.us-east-2.aws.neon.tech/neondb?sslmode=require&channel_binding=require"
+    norm_url, connect_args = _get_normalized_db_url(neon_full_url)
+    assert norm_url.startswith("postgresql+asyncpg://")
+    assert "channel_binding" not in norm_url
+    assert "sslmode" not in norm_url
+    assert connect_args.get("ssl") == "require"
