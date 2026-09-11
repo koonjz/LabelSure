@@ -39,4 +39,13 @@ class User {
       default: return 'Consumer';
     }
   }
+
+  Map<String, dynamic> toJson() => {
+    'id': id,
+    'email': email,
+    'full_name': fullName,
+    'role': role,
+    'region': region,
+    'is_active': isActive,
+  };
 }

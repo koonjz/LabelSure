@@ -176,7 +176,7 @@ class _ScanScreenState extends State<ScanScreen> with SingleTickerProviderStateM
                       children: [
                         const Text(
                           'Scan Label',
-                          style: const TextStyle(
+                          style: TextStyle(
                             color: Colors.white,
                             fontSize: 28,
                             fontWeight: FontWeight.bold,
@@ -192,17 +192,69 @@ class _ScanScreenState extends State<ScanScreen> with SingleTickerProviderStateM
                       ],
                     ),
                   ),
-                  Container(
-                    padding: const EdgeInsets.all(10),
-                    decoration: BoxDecoration(
-                      color: Colors.white.withValues(alpha: 0.08),
+                  PopupMenuButton<String>(
+                    tooltip: 'Account options',
+                    icon: Container(
+                      padding: const EdgeInsets.all(10),
+                      decoration: BoxDecoration(
+                        color: Colors.white.withValues(alpha: 0.08),
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      child: const Icon(
+                        Icons.account_circle_outlined,
+                        color: Color(0xFF3B82F6),
+                        size: 24,
+                      ),
+                    ),
+                    color: const Color(0xFF1E293B),
+                    shape: RoundedRectangleBorder(
                       borderRadius: BorderRadius.circular(12),
+                      side: BorderSide(color: Colors.white.withValues(alpha: 0.1)),
                     ),
-                    child: const Icon(
-                      Icons.document_scanner_rounded,
-                      color: Color(0xFF3B82F6),
-                      size: 24,
-                    ),
+                    onSelected: (value) async {
+                      if (value == 'logout') {
+                        await auth.logout();
+                      }
+                    },
+                    itemBuilder: (context) => [
+                      PopupMenuItem(
+                        enabled: false,
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              auth.user?.displayName ?? 'User',
+                              style: const TextStyle(
+                                color: Colors.white,
+                                fontWeight: FontWeight.bold,
+                                fontSize: 14,
+                              ),
+                            ),
+                            Text(
+                              auth.user?.roleLabel ?? 'Consumer',
+                              style: TextStyle(
+                                color: Colors.white.withValues(alpha: 0.6),
+                                fontSize: 12,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                      const PopupMenuDivider(),
+                      const PopupMenuItem(
+                        value: 'logout',
+                        child: Row(
+                          children: [
+                            Icon(Icons.logout_rounded, color: Color(0xFFEF4444), size: 18),
+                            SizedBox(width: 8),
+                            Text(
+                              'Log Out',
+                              style: TextStyle(color: Color(0xFFEF4444)),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
                   ),
                 ],
               ),
@@ -362,10 +414,10 @@ class _ScanScreenState extends State<ScanScreen> with SingleTickerProviderStateM
                         const Row(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
-                            const Icon(Icons.lightbulb_outline,
+                            Icon(Icons.lightbulb_outline,
                                 color: Color(0xFFFBBF24), size: 15),
-                            const SizedBox(width: 6),
-                            const Expanded(
+                            SizedBox(width: 6),
+                            Expanded(
                               child: Text(
                                 'Tip: The backend may be starting up (cold start can take ~90 s). '
                                 'Wait a moment and tap "Scan for Compliance" again.',
