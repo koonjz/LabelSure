@@ -151,7 +151,12 @@ def run_tesseract(image_path: str, lang_code: str = "eng") -> OCRResult:
         bbox = [row["left"], row["top"], row["width"], row["height"]]
         boxes.append(OCRBox(text=str(row["text"]), confidence=conf_norm, bbox=bbox))
 
-    return _build_result(boxes, engine="tesseract")
+    try:
+        raw_text = pytesseract.image_to_string(pil_img, lang=tess_lang)
+    except Exception:
+        raw_text = None
+
+    return _build_result(boxes, engine="tesseract", text_override=raw_text)
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -193,8 +198,11 @@ def run_ocr(image_path: str, lang_code: str = "en") -> OCRResult:
 # Helpers
 # ─────────────────────────────────────────────────────────────────────────────
 
-def _build_result(boxes: list[OCRBox], engine: str) -> OCRResult:
-    full_text = " ".join(b.text for b in boxes)
+def _build_result(boxes: list[OCRBox], engine: str, text_override: Optional[str] = None) -> OCRResult:
+    if text_override and text_override.strip():
+        full_text = text_override.strip()
+    else:
+        full_text = "\n".join(b.text for b in boxes)
     confidences = [b.confidence for b in boxes] if boxes else [0.0]
     return OCRResult(
         boxes=boxes,
@@ -203,3 +211,4 @@ def _build_result(boxes: list[OCRBox], engine: str) -> OCRResult:
         avg_confidence=sum(confidences) / len(confidences),
         engine_used=engine,
     )
+

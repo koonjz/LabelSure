@@ -21,13 +21,32 @@ logger = logging.getLogger(__name__)
 # Pattern catalogue (English + common Indic transliterations)
 # ─────────────────────────────────────────────────────────────────────────────
 
-# MRP patterns: "MRP Rs.45.00", "MRP ₹45", "M.R.P. ₹45.00", "MRP: 45", "MRP ₹: 5.00"
-_MRP_PATTERN = re.compile(
-    r"(?:M\.?R\.?P\.?|Maximum\s+Retail\s+Price)[:\s]*"
-    r"(?:Rs\.?|INR|₹)?[:\s]*"
-    r"(\d{1,6}(?:[.,]\d{1,2})?)",
+# MRP patterns:
+# Priority 1: Labelled MRP ("MRP ₹150/-", "MRP : 150", "M.R.P. : ₹150.00", "MRP (incl. of all taxes) : 150")
+_LABELLED_MRP_PATTERN = re.compile(
+    r"(?:"
+    r"M\.?\s*R\.?\s*P\.?"                      # MRP, M.R.P., M R P, M. R. P.
+    r"|M\.?\s*B\.?\s*P\.?"                      # OCR typo MBP
+    r"|M\.?\s*R\.?\s*F\.?"                      # OCR typo MRF
+    r"|Max(?:imum|\.)?\s+Retail\s+Price"       # Maximum Retail Price, Max. Retail Price
+    r"|Retail\s+Price"                         # Retail Price
+    r"|Price"                                  # Price
+    r")"
+    r"(?:\s*\([^)]*(?:tax|all|incl)[^)]*\))?"  # Optional (Incl. of all taxes)
+    r"[:\s\-._]*"                              # Separators
+    r"(?:Rs\.?|INR|₹|Re\.?|[?*`'~^|\\/])?"     # Optional currency symbol or OCR symbol artifact
+    r"[:\s\-._]*"                              # Secondary separators
+    r"(\d{1,6}(?:[.,]\d{1,2})?)"               # Numerical amount
+    r"(?:\s*/\s*-|\s*/-|\b)",                  # Optional /- suffix
     re.IGNORECASE,
 )
+
+# Priority 2: Standalone currency price fallback (e.g. "₹ 150/-", "Rs. 150/-", "₹150")
+_STANDALONE_PRICE_PATTERN = re.compile(
+    r"(?:Rs\.?|INR|₹)\s*(\d{1,6}(?:[.,]\d{1,2})?)\s*(?:/\s*-|/-|\b)",
+    re.IGNORECASE,
+)
+
 
 # Net quantity patterns:
 # Priority 1: Explicit labelled declaration (e.g. "Net Weight : 250 Gm", "Net Wt. 500g")
@@ -146,11 +165,20 @@ def extract_fields(ocr_result: OCRResult, lang_code: str = "en") -> LabelData:
 # ─────────────────────────────────────────────────────────────────────────────
 
 def _extract_mrp(text: str) -> Optional[float]:
-    match = _MRP_PATTERN.search(text)
+    # 1. Look for explicit labelled MRP declaration
+    match = _LABELLED_MRP_PATTERN.search(text)
     if match:
         raw = match.group(1).replace(",", ".")
         try:
             return float(raw)
+        except ValueError:
+            pass
+    # 2. Look for standalone currency declaration fallback
+    match2 = _STANDALONE_PRICE_PATTERN.search(text)
+    if match2:
+        raw2 = match2.group(1).replace(",", ".")
+        try:
+            return float(raw2)
         except ValueError:
             pass
     return None
