@@ -48,7 +48,7 @@ web_dashboard/node_modules/
 web_dashboard/dist/
 web_dashboard/.env
 web_dashboard/.env.local
-web_dashboard/.env.production
+!web_dashboard/.env.production
 
 # ─── IDE ─────────────────────────────────────────────────────────────────────
 .idea/
