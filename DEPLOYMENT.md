@@ -96,31 +96,23 @@ at €5/month) or a managed Kubernetes service. Railway becomes expensive at sca
 
 ---
 
-### Step 3 — Provision PostgreSQL 🔴
+### Step 3 — Provision PostgreSQL (Neon / Railway / Supabase) 🔴
 
-**On Railway (simplest):**
+**Option A — Neon Serverless Postgres (Recommended for performance & free tier):**
+
+1. Go to [neon.tech](https://neon.tech) and sign up for a free account.
+2. Create a new project (e.g. `labelsure-db`).
+3. On the project Dashboard, locate the **Connection Details** widget.
+4. Copy the PostgreSQL connection string. It will look like:
+   `postgres://alex:AbC123dEf@ep-cool-darkness-123456.us-east-2.aws.neon.tech/neondb?sslmode=require`
+5. Paste it directly as `DATABASE_URL` in your `.env` (local) or your hosting platform's environment variables.
+   > ⚡ **LabelSure automatically normalizes** Neon's `postgres://` or `postgresql://` URLs to `postgresql+asyncpg://` and configures SSL (`connect_args={"ssl": "require"}`) for you.
+
+**Option B — Railway PostgreSQL:**
 
 1. In your Railway project dashboard → **+ New** → **Database** → **PostgreSQL**
-
-2. Once created, click the database service → **Variables** tab → copy the value of
-   `DATABASE_URL` (it looks like `postgresql://user:pass@host.railway.internal:5432/railway`)
-
-3. **Change the scheme to asyncpg:**
-   Replace `postgresql://` with `postgresql+asyncpg://`
-   Result: `postgresql+asyncpg://user:pass@host.railway.internal:5432/railway`
-
-4. In your backend service → **Variables** → add:
-   ```
-   DATABASE_URL = postgresql+asyncpg://user:pass@host.railway.internal:5432/railway
-   ```
-
-5. Redeploy the backend (or it will restart automatically).
-
-6. **Verify:** Visit `https://your-app.up.railway.app/health` in a browser.
-   You should see: `{"status": "ok", "db": "ok", ...}`
-
-> **Alternatively**, [Supabase](https://supabase.com) gives a free managed Postgres with a nice dashboard.
-> Use the "Session mode" connection string (port 5432) prefixed with `postgresql+asyncpg://`.
+2. Once created, click the database service → **Variables** tab → copy `DATABASE_URL`.
+3. Add `DATABASE_URL` to your backend service environment variables.
 
 ---
 

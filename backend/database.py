@@ -10,8 +10,33 @@ from backend.config import get_settings
 settings = get_settings()
 
 
+def _get_normalized_db_url(url: str) -> tuple[str, dict]:
+    """Normalizes PostgreSQL & Neon connection strings for asyncpg.
+    
+    - Converts 'postgres://' or 'postgresql://' to 'postgresql+asyncpg://'
+    - Prepares connect_args for SSL when connecting to cloud providers (Neon, Render, Supabase)
+    """
+    connect_args = {}
+
+    if url.startswith("sqlite"):
+        connect_args["check_same_thread"] = False
+        return url, connect_args
+
+    # Normalize scheme for asyncpg
+    if url.startswith("postgres://"):
+        url = url.replace("postgres://", "postgresql+asyncpg://", 1)
+    elif url.startswith("postgresql://") and not url.startswith("postgresql+"):
+        url = url.replace("postgresql://", "postgresql+asyncpg://", 1)
+
+    # SSL handling for Neon and managed cloud Postgres
+    if "sslmode=require" in url or "sslmode=verify-full" in url or "neon.tech" in url:
+        connect_args["ssl"] = "require"
+
+    return url, connect_args
+
+
 def _build_engine():
-    url = settings.database_url
+    url, connect_args = _get_normalized_db_url(settings.database_url)
 
     # SQLite: no connection pooling, thread-safety override
     if settings.is_sqlite:
@@ -19,10 +44,10 @@ def _build_engine():
             url,
             echo=settings.debug,
             pool_pre_ping=True,
-            connect_args={"check_same_thread": False},
+            connect_args=connect_args,
         )
 
-    # PostgreSQL (asyncpg): full connection pooling
+    # PostgreSQL / Neon (asyncpg): full connection pooling & SSL support
     return create_async_engine(
         url,
         echo=settings.debug,
@@ -31,6 +56,7 @@ def _build_engine():
         max_overflow=settings.db_max_overflow,
         pool_timeout=settings.db_pool_timeout,
         pool_recycle=settings.db_pool_recycle,
+        connect_args=connect_args,
     )
 
 
