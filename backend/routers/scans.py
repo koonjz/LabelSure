@@ -87,9 +87,17 @@ async def upload_scan(
     with open(image_path, "wb") as fh:
         fh.write(content)
 
-    # Step 1: OCR with English model
+    # Step 1: OCR with primary English/bilingual model
     try:
         ocr_result = run_ocr(str(image_path), lang_code="en")
+        logger.info(
+            "OCR result for '%s' (engine=%s, chars=%d, min_conf=%.2f):\n%s",
+            image_path,
+            ocr_result.engine_used,
+            len(ocr_result.full_text),
+            ocr_result.min_confidence,
+            ocr_result.full_text,
+        )
     except Exception as exc:
         logger.error(
             "OCR failed for image '%s': %s",
@@ -97,25 +105,21 @@ async def upload_scan(
             exc,
             exc_info=True,
         )
-        class _Empty:
-            full_text = ""
-            min_confidence = 0.0
-            avg_confidence = 0.0
-            boxes = []
-            engine_used = "none"
-        ocr_result = _Empty()
+        ocr_result = OCRResult(boxes=[], full_text="", min_confidence=0.0, avg_confidence=0.0, engine_used="none")
 
-    # Step 2: Language detection
+    # Step 2: Language detection (detects Indic Unicode script only if present)
     lang_code = detect_language(ocr_result.full_text)
 
-    # Step 3: Re-run with Indic model if needed
+    # Step 3: Re-run with Indic model only if Indic script was explicitly detected
     if lang_code != "en":
         try:
             ocr_lang = run_ocr(str(image_path), lang_code=lang_code)
-            if ocr_lang.min_confidence >= ocr_result.min_confidence:
+            # Only use Indic OCR if it extracted more content
+            if len(ocr_lang.full_text.strip()) > len(ocr_result.full_text.strip()):
                 ocr_result = ocr_lang
-        except Exception:
-            pass
+        except Exception as exc:
+            logger.warning("Indic OCR pass failed (%s), keeping primary result.", exc)
+
 
     # Step 4: CV font height
     dpi = extract_image_dpi(str(image_path))

@@ -116,45 +116,71 @@ def run_paddleocr(image_path: str, lang_code: str = "en") -> OCRResult:
 # Tesseract wrapper (fallback)
 # ─────────────────────────────────────────────────────────────────────────────
 
-def run_tesseract(image_path: str, lang_code: str = "eng") -> OCRResult:
+def run_tesseract(image_path: str, lang_code: str = "en") -> OCRResult:
     """Run Tesseract OCR on the image and return an OCRResult."""
     if not _TESSERACT_AVAILABLE:
         raise RuntimeError("pytesseract is not installed.")
 
-    # Map short lang codes to tesseract language codes
+    # Always include English ('eng') so Latin numbers & keywords (MRP, Net Qty) are never missed
     tess_lang_map = {
         "en": "eng",
-        "hi": "hin",
-        "ta": "tam",
-        "te": "tel",
-        "kn": "kan",
-        "bn": "ben",
-        "ml": "mal",
-        "mr": "mar",
+        "hi": "eng+hin",
+        "ta": "eng+tam",
+        "te": "eng+tel",
+        "kn": "eng+kan",
+        "bn": "eng+ben",
+        "ml": "eng+mal",
+        "mr": "eng+mar",
     }
     tess_lang = tess_lang_map.get(lang_code, "eng")
 
     pil_img = PILImage.open(image_path)
+    # Fix smartphone camera EXIF orientation (e.g. 90 deg rotated phone captures)
+    try:
+        from PIL import ImageOps
+        pil_img = ImageOps.exif_transpose(pil_img)
+    except Exception:
+        pass
 
-    # Get detailed data (word-level confidence)
-    df = pytesseract.image_to_data(
-        pil_img,
-        lang=tess_lang,
-        output_type=pytesseract.Output.DATAFRAME,
-    )
-    df = df[df["conf"] > 0].dropna(subset=["text"])
-    df = df[df["text"].str.strip() != ""]
+    if pil_img.mode != "RGB":
+        pil_img = pil_img.convert("RGB")
 
+    raw_text = ""
     boxes: list[OCRBox] = []
-    for _, row in df.iterrows():
-        conf_norm = float(row["conf"]) / 100.0
-        bbox = [row["left"], row["top"], row["width"], row["height"]]
-        boxes.append(OCRBox(text=str(row["text"]), confidence=conf_norm, bbox=bbox))
 
     try:
+        # Standard full-page text pass
         raw_text = pytesseract.image_to_string(pil_img, lang=tess_lang)
-    except Exception:
-        raw_text = None
+    except Exception as e:
+        logger.warning("Tesseract primary OCR failed: %s", e)
+
+    # If raw_text is sparse, attempt contrast enhancement pass
+    if len(raw_text.strip()) < 25:
+        try:
+            from PIL import ImageOps
+            gray = ImageOps.grayscale(pil_img)
+            enhanced = ImageOps.autocontrast(gray)
+            alt_text = pytesseract.image_to_string(enhanced, lang=tess_lang)
+            if len(alt_text.strip()) > len(raw_text.strip()):
+                raw_text = alt_text
+        except Exception:
+            pass
+
+    # Extract word boxes
+    try:
+        df = pytesseract.image_to_data(
+            pil_img,
+            lang=tess_lang,
+            output_type=pytesseract.Output.DATAFRAME,
+        )
+        df = df[df["conf"] > 0].dropna(subset=["text"])
+        df = df[df["text"].str.strip() != ""]
+        for _, row in df.iterrows():
+            conf_norm = float(row["conf"]) / 100.0
+            bbox = [row["left"], row["top"], row["width"], row["height"]]
+            boxes.append(OCRBox(text=str(row["text"]), confidence=conf_norm, bbox=bbox))
+    except Exception as e:
+        logger.warning("Tesseract bounding box extraction failed: %s", e)
 
     return _build_result(boxes, engine="tesseract", text_override=raw_text)
 
@@ -203,12 +229,24 @@ def _build_result(boxes: list[OCRBox], engine: str, text_override: Optional[str]
         full_text = text_override.strip()
     else:
         full_text = "\n".join(b.text for b in boxes)
-    confidences = [b.confidence for b in boxes] if boxes else [0.0]
+
+    if boxes:
+        confidences = [b.confidence for b in boxes]
+        min_conf = min(confidences)
+        avg_conf = sum(confidences) / len(confidences)
+    elif full_text:
+        min_conf = 0.85
+        avg_conf = 0.85
+    else:
+        min_conf = 0.0
+        avg_conf = 0.0
+
     return OCRResult(
         boxes=boxes,
         full_text=full_text,
-        min_confidence=min(confidences),
-        avg_confidence=sum(confidences) / len(confidences),
+        min_confidence=min_conf,
+        avg_confidence=avg_conf,
         engine_used=engine,
     )
+
 

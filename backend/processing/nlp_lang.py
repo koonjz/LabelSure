@@ -66,8 +66,8 @@ def detect_language(text: str) -> str:
 
     Strategy:
       1. Check Unicode ranges for Indic scripts (most reliable for short texts).
-      2. Fall back to langdetect for Latin/other scripts.
-      3. Default to 'en' if detection fails.
+      2. If Indic characters are found, return the specific Indic code (e.g. 'hi', 'ta').
+      3. For all other scripts/Latin characters, default to 'en' for Legal Metrology.
 
     Returns:
         ISO-639-1 language code (e.g. 'en', 'hi', 'ta', 'te', 'kn', 'bn').
@@ -81,18 +81,8 @@ def detect_language(text: str) -> str:
         logger.debug(f"Detected Indic script: {indic_lang}")
         return indic_lang
 
-    # Step 2: langdetect for non-Indic
-    if _LANGDETECT_AVAILABLE:
-        try:
-            lang = detect(text)
-            # langdetect returns zh-cn, zh-tw etc. — normalise
-            lang_short = lang.split("-")[0].lower()
-            logger.debug(f"langdetect result: {lang_short}")
-            return lang_short
-        except (LangDetectException, Exception) as e:
-            logger.debug(f"langdetect failed: {e}")
-
     return "en"
+
 
 
 def normalise_indic_text(text: str, lang_code: str) -> str:
