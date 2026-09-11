@@ -10,6 +10,8 @@ class Scan {
   final DateTime createdAt;
   final DateTime? processedAt;
   final double? enteredSalePrice;
+  final String? rawOcrText;   // Full OCR output for debugging
+  final String? ocrEngine;    // paddleocr / tesseract / none
   final List<ExtractedField> extractedFields;
   final List<RuleResult> ruleResults;
 
@@ -24,6 +26,8 @@ class Scan {
     required this.createdAt,
     this.processedAt,
     this.enteredSalePrice,
+    this.rawOcrText,
+    this.ocrEngine,
     required this.extractedFields,
     required this.ruleResults,
   });
@@ -40,6 +44,8 @@ class Scan {
       createdAt: DateTime.parse(json['created_at'] ?? DateTime.now().toIso8601String()),
       processedAt: json['processed_at'] != null ? DateTime.parse(json['processed_at']) : null,
       enteredSalePrice: (json['entered_sale_price'] as num?)?.toDouble(),
+      rawOcrText: json['raw_ocr_text'],
+      ocrEngine: json['ocr_engine'],
       extractedFields: (json['extracted_fields'] as List<dynamic>? ?? [])
           .map((e) => ExtractedField.fromJson(e))
           .toList(),

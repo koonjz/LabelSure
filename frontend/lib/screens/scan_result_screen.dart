@@ -135,6 +135,12 @@ class ScanResultScreen extends StatelessWidget {
                 const SizedBox(height: 12),
                 _ExtractedFieldsCard(fields: scan.extractedFields),
 
+                const SizedBox(height: 20),
+
+                // Raw OCR text (collapsible debug section)
+                if (scan.rawOcrText != null && scan.rawOcrText!.trim().isNotEmpty)
+                  _RawOcrCard(rawText: scan.rawOcrText!),
+
                 const SizedBox(height: 30),
 
                 // New scan button
@@ -222,6 +228,14 @@ class _SummaryCard extends StatelessWidget {
               icon: Icons.translate_rounded,
             ),
           ],
+          if (scan.ocrEngine != null) ...[
+            const Divider(color: Colors.white12, height: 20),
+            _InfoRow(
+              label: 'OCR Engine',
+              value: _engineLabel(scan.ocrEngine!),
+              icon: Icons.memory_rounded,
+            ),
+          ],
           const Divider(color: Colors.white12, height: 20),
           _InfoRow(
             label: 'Rules Passed',
@@ -243,6 +257,15 @@ class _SummaryCard extends StatelessWidget {
       'gu': 'Gujarati', 'pa': 'Punjabi', 'mr': 'Marathi',
     };
     return map[code] ?? code.toUpperCase();
+  }
+
+  String _engineLabel(String engine) {
+    switch (engine.toLowerCase()) {
+      case 'paddleocr': return 'PaddleOCR ✦';
+      case 'tesseract': return 'Tesseract';
+      case 'paddleocr+tesseract': return 'PaddleOCR + Tesseract';
+      default: return engine;
+    }
   }
 }
 
@@ -355,5 +378,86 @@ class _ExtractedFieldsCard extends StatelessWidget {
         },
       ),
     ).animate().fadeIn(delay: 200.ms);
+  }
+}
+
+// ─── Raw OCR Text Card ────────────────────────────────────────────────────────
+class _RawOcrCard extends StatefulWidget {
+  final String rawText;
+  const _RawOcrCard({required this.rawText});
+
+  @override
+  State<_RawOcrCard> createState() => _RawOcrCardState();
+}
+
+class _RawOcrCardState extends State<_RawOcrCard> {
+  bool _expanded = false;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      decoration: BoxDecoration(
+        color: const Color(0xFF0F1A2E),
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: const Color(0xFF3B82F6).withOpacity(0.25)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          InkWell(
+            borderRadius: BorderRadius.circular(16),
+            onTap: () => setState(() => _expanded = !_expanded),
+            child: Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+              child: Row(
+                children: [
+                  const Icon(Icons.document_scanner_rounded,
+                      color: Color(0xFF60A5FA), size: 18),
+                  const SizedBox(width: 10),
+                  const Expanded(
+                    child: Text(
+                      'Raw OCR Text',
+                      style: TextStyle(
+                        color: Colors.white,
+                        fontSize: 14,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                  ),
+                  Text(
+                    _expanded ? 'Hide' : 'Show',
+                    style: const TextStyle(
+                        color: Color(0xFF60A5FA), fontSize: 12),
+                  ),
+                  const SizedBox(width: 4),
+                  Icon(
+                    _expanded
+                        ? Icons.keyboard_arrow_up_rounded
+                        : Icons.keyboard_arrow_down_rounded,
+                    color: const Color(0xFF60A5FA),
+                    size: 20,
+                  ),
+                ],
+              ),
+            ),
+          ),
+          if (_expanded) ...[
+            const Divider(color: Colors.white10, height: 1),
+            Padding(
+              padding: const EdgeInsets.all(14),
+              child: SelectableText(
+                widget.rawText,
+                style: const TextStyle(
+                  color: Color(0xFFCBD5E1),
+                  fontSize: 11,
+                  fontFamily: 'monospace',
+                  height: 1.6,
+                ),
+              ),
+            ),
+          ],
+        ],
+      ),
+    ).animate().fadeIn(delay: 300.ms);
   }
 }

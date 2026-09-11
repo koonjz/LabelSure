@@ -19,12 +19,14 @@ pydantic[email]==2.8.2
 pydantic-settings==2.3.4
 
 # ─── OCR ───────────────────────────────────────────────────────────────────────
-# paddleocr & paddlepaddle can be installed for GPU/high-RAM servers (>1.5 GB RAM).
-# For cloud free-tiers (Render 512 MB RAM), Tesseract is used (pytesseract + system tesseract).
-# paddleocr==2.7.3
-# paddlepaddle>=2.6.2
+# PaddleOCR (primary engine) — CPU-only paddlepaddle (~200 MB).
+# Uncomment the two paddle lines if running on a server with >1.5 GB RAM.
+# For low-RAM free-tiers, comment out paddle and rely on Tesseract alone.
+paddleocr==2.7.3
+paddlepaddle==2.6.2
 pytesseract==0.3.10
 Pillow==10.4.0
+scikit-image==0.22.0
 
 # ─── Computer Vision ───────────────────────────────────────────────────────────
 opencv-python-headless==4.10.0.84

@@ -9,11 +9,13 @@ FROM python:3.11-slim AS builder
 
 WORKDIR /build
 
-# Install build tools needed for C extensions (e.g. psycopg2, numpy)
+# Install build tools needed for C extensions (e.g. psycopg2, numpy, PaddleOCR)
 RUN apt-get update && apt-get install -y --no-install-recommends \
     gcc \
     g++ \
     libpq-dev \
+    cmake \
+    libopenblas-dev \
     && rm -rf /var/lib/apt/lists/*
 
 COPY requirements.txt .
@@ -31,8 +33,8 @@ LABEL org.opencontainers.image.description="FastAPI compliance-scanner backend"
 
 WORKDIR /app
 
-# ─── OS-level dependencies (OCR + CV + Postgres) ────────────────────────────
-# Tesseract OCR engine with Indic language packs + OpenCV runtime libraries.
+# ─── OS-level dependencies (OCR + CV + Postgres + PaddleOCR) ────────────────
+# Tesseract OCR engine with Indic language packs + OpenCV + PaddleOCR runtime.
 RUN apt-get update && apt-get install -y --no-install-recommends \
     tesseract-ocr \
     tesseract-ocr-hin \
@@ -40,13 +42,19 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     tesseract-ocr-tel \
     tesseract-ocr-kan \
     tesseract-ocr-ben \
+    tesseract-ocr-guj \
+    tesseract-ocr-pan \
+    tesseract-ocr-mal \
+    tesseract-ocr-mar \
     libgomp1 \
     libglib2.0-0 \
     libsm6 \
     libxext6 \
     libxrender1 \
     libgl1 \
+    libgthread-2.0-0 \
     libpq5 \
+    wget \
     curl \
     && rm -rf /var/lib/apt/lists/*
 

@@ -22,45 +22,50 @@ logger = logging.getLogger(__name__)
 # ─────────────────────────────────────────────────────────────────────────────
 
 # MRP patterns:
-# Priority 1: Labelled MRP ("MRP ₹150/-", "MRP : 150", "M.R.P. : ₹150.00", "MRP (incl. of all taxes) : 150")
+# Priority 1: Labelled MRP (explicit declaration on the label)
+# Handles: "MRP ₹150/-", "MRP : 150", "M.R.P. : ₹150.00",
+#          "MRP (incl. of all taxes) : 150", "MRP Rs. 20.00"
+#          "MRP. 250/-", "M R P : 18", "M.R.P Rs 25/-"
 _LABELLED_MRP_PATTERN = re.compile(
     r"(?:"
     r"M\.?\s*R\.?\s*P\.?"                      # MRP, M.R.P., M R P, M. R. P.
     r"|M\.?\s*B\.?\s*P\.?"                      # OCR typo MBP
     r"|M\.?\s*R\.?\s*F\.?"                      # OCR typo MRF
-    r"|Max(?:imum|\.)?\s+Retail\s+Price"       # Maximum Retail Price, Max. Retail Price
+    r"|Max(?:imum|\.)?\s+Retail\s+Price"       # Maximum Retail Price
+    r"|Max\.?\s*Ret\.?\s*Price"                # Max. Ret. Price
     r"|Retail\s+Price"                         # Retail Price
-    r"|Price"                                  # Price
+    r"|(?<!\w)Price(?!\s*:\s*\w{10,})"        # Lone "Price" keyword (not "Price: Unavailable...")
     r")"
     r"(?:\s*\([^)]*(?:tax|all|incl)[^)]*\))?"  # Optional (Incl. of all taxes)
     r"[:\s\-._]*"                              # Separators
-    r"(?:Rs\.?|INR|₹|Re\.?|[?*`'~^|\\/])?"     # Optional currency symbol or OCR symbol artifact
+    r"(?:Rs\.?|INR|₹|Re\.?|[?*`'~^|\\/])?"    # Optional currency symbol or OCR artifact
     r"[:\s\-._]*"                              # Secondary separators
-    r"(\d{1,6}(?:[.,]\d{1,2})?)"               # Numerical amount
+    r"(\d{1,6}(?:[.,]\d{1,2})?)"              # Numerical amount (GROUP 1)
     r"(?:\s*/\s*-|\s*/-|\b)",                  # Optional /- suffix
     re.IGNORECASE,
 )
 
 # Priority 2: Standalone currency price fallback (e.g. "₹ 150/-", "Rs. 150/-", "₹150")
 _STANDALONE_PRICE_PATTERN = re.compile(
-    r"(?:Rs\.?|INR|₹)\s*(\d{1,6}(?:[.,]\d{1,2})?)\s*(?:/\s*-|/-|\b)",
+    r"(?:Rs\.?|INR|₹|Re\.?)\s*(\d{1,6}(?:[.,]\d{1,2})?)\s*(?:/\s*-|/-|\b)",
     re.IGNORECASE,
 )
 
 
 # Net quantity patterns:
-# Priority 1: Explicit labelled declaration (e.g. "Net Weight : 250 Gm", "Net Wt. 500g")
+# Priority 1: Explicit labelled declaration
 _LABELLED_NET_QTY_PATTERN = re.compile(
-    r"(?:Net\s+(?:Wt\.?|Weight|Contents?|Quantity|Vol\.?|Volume|Qty\.?)"
-    r"|NET\s+(?:WT\.?|WEIGHT|CONTENTS?|QUANTITY|VOL\.?|VOLUME|QTY\.?))[\s:]*"
+    r"(?:Net\s+(?:Wt\.?|Weight|Contents?|Quantity|Vol\.?|Volume|Qty\.?|Cont\.?)"
+    r"|NET\s+(?:WT\.?|WEIGHT|CONTENTS?|QUANTITY|VOL\.?|VOLUME|QTY\.?|CONT\.?)"
+    r"|Nett\s+(?:Wt\.?|Weight|Vol\.?|Qty\.?))[:\s]*"
     r"(\d+(?:[.,]\d+)?)\s*"
     r"(g(?:m(?:s)?)?|kg(?:s)?|ml|millilitre|l(?:tr?(?:e)?)?|litre|liter|pcs?|nos?|pieces?|number)\b",
     re.IGNORECASE,
 )
 
-# Priority 2: Standalone declaration (fallback)
+# Priority 2: Standalone declaration (e.g. just "250 g" or "500ml")
 _STANDALONE_NET_QTY_PATTERN = re.compile(
-    r"(\d+(?:[.,]\d+)?)\s*"
+    r"(?<!\d)(\d+(?:[.,]\d+)?)\s*"
     r"(g(?:m(?:s)?)?|kg(?:s)?|ml|millilitre|l(?:tr?(?:e)?)?|litre|liter|pcs?|nos?|pieces?|number)\b",
     re.IGNORECASE,
 )
@@ -78,14 +83,15 @@ _MFG_DATE_PATTERN = re.compile(
     r"|Mfg\.?/Pkg\.?"
     r"|Manufacturing\s+Date"
     r"|Packing\s+Date"
+    r"|Manuf(?:actured)?\s+(?:On|Date)"
     r")[:\s]*"
     r"(?:"
-    r"(\d{1,2})[/\-.](\d{1,2})[/\-.](\d{4})"   # group 1,2,3: DD/MM/YYYY or MM/DD/YYYY (4-digit year)
-    r"|(\d{1,2})[/\-.](\d{4})"                 # group 4,5: MM/YYYY or DD/YYYY (4-digit year)
-    r"|(\d{4})[/\-.](\d{1,2})"                 # group 6,7: YYYY/MM
-    r"|([A-Za-z]{3,9})[\s,]+(\d{4})"           # group 8,9: Mon YYYY
-    r"|(\d{1,2})[/\-.](\d{1,2})[/\-.](\d{2})"  # group 10,11,12: DD/MM/YY (2-digit year)
-    r"|(\d{1,2})[/\-.](\d{2})"                 # group 13,14: MM/YY (2-digit year)
+    r"(\d{1,2})[/\-.](\\d{1,2})[/\-.](\d{4})"   # group 1,2,3: DD/MM/YYYY
+    r"|(\d{1,2})[/\-.](\d{4})"                   # group 4,5: MM/YYYY
+    r"|(\d{4})[/\-.](\d{1,2})"                   # group 6,7: YYYY/MM
+    r"|([A-Za-z]{3,9})[\s,]+(\d{4})"             # group 8,9: Mon YYYY
+    r"|(\d{1,2})[/\-.](\d{1,2})[/\-.](\d{2})"   # group 10,11,12: DD/MM/YY
+    r"|(\d{1,2})[/\-.](\d{2})"                   # group 13,14: MM/YY
     r")",
     re.IGNORECASE,
 )
@@ -96,55 +102,97 @@ _MONTH_NAMES = {
     "jul": 7, "aug": 8, "sep": 9, "oct": 10, "nov": 11, "dec": 12,
 }
 
-# Manufacturer/Packer/Importer name: look for keywords
+# Manufacturer/Packer/Importer name
 _MFR_NAME_PATTERN = re.compile(
-    r"(?:Manufactured\s+(?:and\s+Marketed\s+)?by|Mfg\.?\s*(?:&|and)?\s*(?:Pkd\.?)?\s*by|Packed\s+by|Pkd\.?\s+by|Marketed\s+by|Mkt\.?\s+by|Imported\s+by|Manufacturer|Producer|Packer)[:\s]*"
-    r"([A-Za-z0-9\s&,.\-'()/]{3,80}?)"
-    r"(?=\n\s*(?:MRP|Net|Batch|LOT|PKD|Packed|Best|Exp|Lic|FSSAI|Weight|Store|Customer|Consumer|Address|Email|Plot)|$|\n\n)",
+    r"(?:Manufactured\s+(?:and\s+Marketed\s+)?by"
+    r"|Mfg\.?\s*(?:&|and)?\s*(?:Pkd\.?)?\s*by"
+    r"|Packed\s+(?:and\s+Marketed\s+)?by"
+    r"|Pkd\.?\s+by"
+    r"|Marketed\s+by"
+    r"|Mkt\.?\s+by"
+    r"|Imported\s+by"
+    r"|Manufacturer"
+    r"|Producer"
+    r"|Packer)[:\s]*"
+    r"([A-Za-z0-9\s&,.\-'()/]{3,100}?)"
+    r"(?=\n\s*(?:MRP|Net|Batch|LOT|PKD|Packed|Best|Exp|Lic|FSSAI|Weight|Store|Customer|Consumer|Address|Email|Plot|Ph|Tel|www)|$|\n\n)",
     re.IGNORECASE,
 )
 
 # Address pattern: PIN code anchor OR address keywords
 _ADDRESS_PIN_PATTERN = re.compile(
-    r"([A-Za-z0-9\s,.\-/]{10,150})\s*[-,]?\s*(?:Pin|PIN)?\s*(\d{6})\b",
+    r"([A-Za-z0-9\s,.\-/]{10,200})\s*[-,]?\s*(?:Pin|PIN|Pin\s*Code)?\s*[-:\s]?\s*(\d{6})\b",
     re.IGNORECASE,
 )
 
 _ADDRESS_KEYWORD_PATTERN = re.compile(
     r"(?:Address|Regd\.?\s*Office|Factory|Unit|Works|Plot|Mfg\.?\s*at|Packed\s*at)[:\s\-._]*"
-    r"([A-Za-z0-9\s,.\-/]{8,120}?)"
+    r"([A-Za-z0-9\s,.\-/]{8,200}?)"
     r"(?=\n\s*(?:MRP|Net|Batch|LOT|PKD|Packed|Best|Exp|Lic|FSSAI|Weight|Store|Customer|Consumer)|$|\n\n)",
     re.IGNORECASE,
 )
 
 # Batch / Lot No.
 _BATCH_PATTERN = re.compile(
-    r"(?:Batch\s*(?:No\.?|Number)?|LOT\s*(?:No\.?|Number)?|B\.?\s*No\.?)[:\s\-._]*"
-    r"([A-Za-z0-9/\-_]{3,30})",
+    r"(?:Batch\s*(?:No\.?|Number|Code)?|LOT\s*(?:No\.?|Number)?|B\.?\s*No\.?|Batch\s*#)[:\s\-._]*"
+    r"([A-Za-z0-9/\-_]{2,40})",
     re.IGNORECASE,
 )
 
-# Best Before / Expiry
+# Best Before / Expiry — several label variants
 _EXPIRY_PATTERN = re.compile(
-    r"(?:Best\s+Before|Use\s+By\s+Date|Use\s+By|Expiry\s+Date|Exp\.?\s*Date|Exp\.?)[:\s\-._]*"
-    r"([A-Za-z0-9\s/\-.,]{3,50}?)"
-    r"(?=\n\s*(?:MRP|Net|Batch|LOT|PKD|Packed|fssai|Lic|Store|Customer|Mfg)|$|\n\n)",
+    r"(?:Best\s+Before"
+    r"|Use\s+By\s+Date"
+    r"|Use\s+By"
+    r"|Expiry\s+Date"
+    r"|Exp(?:iry|\.?)?\s*(?:Date|Dt)?\.?"
+    r"|Best\s+Before\s+(?:Date|End)"
+    r"|BB\s+Date"
+    r"|BBD)[:\s\-._]*"
+    r"([A-Za-z0-9\s/\-.,]{2,60}?)"
+    r"(?=\n\s*(?:MRP|Net|Batch|LOT|PKD|Packed|fssai|Lic|Store|Customer|Mfg|Consumer)|$|\n\n)",
     re.IGNORECASE,
 )
 
-# FSSAI License Number
+# FSSAI License Number — 14-digit number OR licence text
 _FSSAI_PATTERN = re.compile(
-    r"(?:fssai|FSSAI)[\s\w.]*(?:Lic\.?\s*(?:No\.?)?|License\s*(?:No\.?)?)?[:\s\-._]*"
-    r"([A-Za-z0-9\s]{3,30}?)"
+    r"(?:fssai|FSSAI)[\s\w.]*(?:Lic(?:ense|ence)?\.?\s*(?:No\.?)?|No\.?)?[:\s\-._]*"
+    r"(\d{14}|\d[\d\s\-]{12,18}\d|[A-Za-z0-9\s]{3,30}?)"
     r"(?=\n\s*(?:MRP|Net|Batch|LOT|PKD|Packed|Best|Store|Customer|Mfg)|$|\n\n)",
     re.IGNORECASE,
 )
 
+# Stand-alone 14-digit FSSAI number (even without keyword, if it looks like one)
+_FSSAI_14DIGIT_PATTERN = re.compile(
+    r"\b(1[0-9]{13})\b"  # FSSAI numbers start with 1 and are 14 digits
+)
+
 # Consumer Care / Helpline / Email
 _CONSUMER_CARE_PATTERN = re.compile(
-    r"(?:Consumer\s*Care|Customer\s*Care|Helpline|Toll\s*Free|Feedback|For\s*Feedback)[:\s\-._]*"
-    r"([A-Za-z0-9@.\s\-_+()]{5,80}?)"
+    r"(?:Consumer\s*Care"
+    r"|Customer\s*(?:Care|Service)"
+    r"|Helpline"
+    r"|Toll\s*Free"
+    r"|Feedback"
+    r"|For\s*(?:Feedback|Queries|Complaints)"
+    r"|Contact\s*Us"
+    r"|Call\s*Us)[:\s\-._]*"
+    r"([A-Za-z0-9@.\s\-_+()/]{5,100}?)"
     r"(?=\n\s*(?:MRP|Net|Batch|LOT|PKD|Packed|Best|fssai|Mfg)|$|\n\n)",
+    re.IGNORECASE,
+)
+
+# Phone number pattern (standalone, not preceded by a keyword above)
+_PHONE_PATTERN = re.compile(
+    r"(?:Ph\.?|Tel\.?|Phone|Mobile|Mob\.?|Call)[:\s]*([+\d\s\-()]{8,20})",
+    re.IGNORECASE,
+)
+
+# Country of origin
+_COUNTRY_ORIGIN_PATTERN = re.compile(
+    r"(?:Country\s+of\s+(?:Origin|Mfg\.?)|Made\s+in|Product\s+of)[:\s\-._]*"
+    r"([A-Za-z\s]{3,30}?)"
+    r"(?=\n|\.|,|$)",
     re.IGNORECASE,
 )
 
@@ -153,7 +201,37 @@ _IGNORED_PRODUCT_KEYWORDS = {
     "packed on", "mfg date", "best before", "fssai", "store in", "calories", "keep in",
     "customer care", "consumer care", "marketed by", "manufactured by", "packed by",
     "serving size", "approx", "coocking", "cooking", "lic no", "lot no", "pkd",
+    "energy", "protein", "carbohydrate", "fat", "sodium", "fibre", "fiber",
+    "per 100", "per serving", "daily value", "allergen", "contains",
 }
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# OCR text normalizer
+# ─────────────────────────────────────────────────────────────────────────────
+
+def _normalize_ocr_text(text: str) -> str:
+    """
+    Fix common OCR transcription errors before regex extraction:
+    - Reconnect broken lines (e.g. "MR\nP" → "MRP")
+    - Normalize confusable characters (₹ ← ?, *, 2)
+    - Fix spacing around colons and digits
+    """
+    # Join lines broken in the middle of a keyword
+    text = re.sub(r"\bMR\s*\n\s*P\b", "MRP", text, flags=re.IGNORECASE)
+    text = re.sub(r"\bM\.?\s*\n\s*R\.?\s*\n\s*P\.?\b", "M.R.P.", text, flags=re.IGNORECASE)
+
+    # OCR often reads ₹ as ?, *, ^, ', |, \, /
+    # Replace lone symbol before a digit (price context) with ₹
+    text = re.sub(r"(?<!\w)[?*`'~^|\\](?=\s*\d{1,6})", "₹", text)
+
+    # Normalize line endings
+    text = text.replace("\r\n", "\n").replace("\r", "\n")
+
+    # Collapse multiple blank lines
+    text = re.sub(r"\n{3,}", "\n\n", text)
+
+    return text
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -171,8 +249,11 @@ def extract_fields(ocr_result: OCRResult, lang_code: str = "en") -> LabelData:
     Returns:
         LabelData with populated fields and overall_ocr_confidence.
     """
-    text = ocr_result.full_text
+    raw_text = ocr_result.full_text
+    text = _normalize_ocr_text(raw_text)
     confidence = ocr_result.min_confidence
+
+    logger.debug("Field extractor input text (%d chars):\n%s", len(text), text[:2000])
 
     mrp = _extract_mrp(text)
     net_qty_value, net_qty_unit = _extract_net_qty(text)
@@ -184,6 +265,12 @@ def extract_fields(ocr_result: OCRResult, lang_code: str = "en") -> LabelData:
     expiry = _extract_expiry(text)
     fssai = _extract_fssai(text)
     consumer_care = _extract_consumer_care(text)
+
+    logger.info(
+        "Extracted — MRP:%.2f  NetQty:%s%s  Mfg:%s/%s  FSSAI:%s  Batch:%s  Expiry:%s",
+        mrp or 0, net_qty_value, net_qty_unit or "", mfg_month, mfg_year,
+        fssai, batch_no, expiry,
+    )
 
     return LabelData(
         manufacturer_name=mfr_name,
@@ -216,15 +303,20 @@ def _extract_mrp(text: str) -> Optional[float]:
     if match:
         raw = match.group(1).replace(",", ".")
         try:
-            return float(raw)
+            val = float(raw)
+            if 1.0 <= val <= 99999.0:   # sanity check
+                return val
         except ValueError:
             pass
+
     # 2. Look for standalone currency declaration fallback
     match2 = _STANDALONE_PRICE_PATTERN.search(text)
     if match2:
         raw2 = match2.group(1).replace(",", ".")
         try:
-            return float(raw2)
+            val2 = float(raw2)
+            if 1.0 <= val2 <= 99999.0:
+                return val2
         except ValueError:
             pass
     return None
@@ -243,14 +335,16 @@ def _extract_net_qty(text: str) -> tuple[Optional[float], Optional[str]]:
         unit_map = {
             "gm": "g", "gms": "g", "gram": "g", "grams": "g",
             "kgs": "kg",
-            "millilitre": "ml",
+            "millilitre": "ml", "milliliter": "ml",
             "ltr": "l", "litre": "l", "liter": "l", "lt": "l",
             "pcs": "pcs", "pc": "pcs",
             "nos": "pcs", "no": "pcs", "pieces": "pcs", "number": "pcs",
         }
         unit = unit_map.get(unit, unit)
         try:
-            return float(raw_val), unit
+            val = float(raw_val)
+            if val > 0:
+                return val, unit
         except ValueError:
             pass
     return None, None
@@ -304,20 +398,28 @@ def _extract_manufacturer_name(text: str) -> Optional[str]:
     match = _MFR_NAME_PATTERN.search(text)
     if match:
         name = match.group(1).strip().rstrip(",.")
+        # Remove trailing address snippets that leaked past the lookahead
+        name = re.split(r"\n", name)[0].strip()
         if len(name) >= 3:
             return name
     return None
 
 
 def _extract_manufacturer_address(text: str) -> Optional[str]:
+    # Try PIN code anchor first (most reliable)
     match = _ADDRESS_PIN_PATTERN.search(text)
     if match:
-        addr = match.group(1).strip().rstrip(",.")
+        addr_raw = match.group(1).strip().rstrip(",.")
         pin = match.group(2)
-        return f"{addr} - {pin}"
+        # Clean up multi-line artefacts
+        addr_clean = re.sub(r"\s*\n\s*", ", ", addr_raw).strip()
+        return f"{addr_clean} - {pin}"
+
+    # Fall back to keyword anchor
     match_kw = _ADDRESS_KEYWORD_PATTERN.search(text)
     if match_kw:
         addr_kw = match_kw.group(1).strip().rstrip(",.")
+        addr_kw = re.sub(r"\s*\n\s*", ", ", addr_kw).strip()
         if len(addr_kw) >= 5:
             return addr_kw
     return None
@@ -330,14 +432,15 @@ def _extract_generic_name(text: str, mfr_name: Optional[str]) -> Optional[str]:
     """
     lines = [l.strip() for l in text.split("\n") if l.strip()]
     for line in lines:
-        if len(line) < 3 or len(line) > 60:
+        if len(line) < 3 or len(line) > 80:
             continue
         line_lower = line.lower()
         if mfr_name and line_lower in mfr_name.lower():
             continue
         if any(kw in line_lower for kw in _IGNORED_PRODUCT_KEYWORDS):
             continue
-        if re.match(r"^[A-Za-z0-9\s\-&']+$", line):
+        # Must contain at least some alphabetical content
+        if re.match(r"^[A-Za-z0-9\s\-&']+$", line) and re.search(r"[A-Za-z]{2,}", line):
             return line
     return None
 
@@ -345,28 +448,49 @@ def _extract_generic_name(text: str, mfr_name: Optional[str]) -> Optional[str]:
 def _extract_batch_number(text: str) -> Optional[str]:
     match = _BATCH_PATTERN.search(text)
     if match:
-        return match.group(1).strip()
+        val = match.group(1).strip()
+        # Sanity check: batch numbers shouldn't be just digits that look like a year/price
+        if len(val) >= 2:
+            return val
     return None
 
 
 def _extract_expiry(text: str) -> Optional[str]:
     match = _EXPIRY_PATTERN.search(text)
     if match:
-        return match.group(1).strip().rstrip(",.")
+        val = match.group(1).strip().rstrip(",.")
+        if len(val) >= 2:
+            return val
     return None
 
 
 def _extract_fssai(text: str) -> Optional[str]:
+    # First try keyword-anchored pattern
     match = _FSSAI_PATTERN.search(text)
     if match:
-        return match.group(1).strip().rstrip(",.")
+        val = match.group(1).strip().rstrip(",.")
+        if len(val) >= 3:
+            return val
+
+    # Fallback: look for any 14-digit number starting with 1
+    # (FSSAI license format is always 14 digits starting with 1x xxxx xxxx xxxxx)
+    match14 = _FSSAI_14DIGIT_PATTERN.search(text)
+    if match14:
+        return match14.group(1)
+
     return None
 
 
 def _extract_consumer_care(text: str) -> Optional[str]:
     match = _CONSUMER_CARE_PATTERN.search(text)
     if match:
-        return match.group(1).strip().rstrip(",.")
+        val = match.group(1).strip().rstrip(",.")
+        if len(val) >= 5:
+            return val
+
+    # Fallback: look for phone number prefixed by common contact keywords
+    phone_match = _PHONE_PATTERN.search(text)
+    if phone_match:
+        return phone_match.group(1).strip()
+
     return None
-
-

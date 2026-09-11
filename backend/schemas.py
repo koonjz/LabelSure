@@ -84,6 +84,8 @@ class ScanUploadResponse(BaseModel):
     needs_manual_review: bool
     review_reason: Optional[str]
     detected_language: Optional[str]
+    raw_ocr_text: Optional[str] = None     # Full OCR text for client-side debugging
+    ocr_engine: Optional[str] = None       # Engine used: paddleocr / tesseract / none
     extracted_fields: List[ExtractedFieldOut]
     rule_results: List[RuleViolationOut]
     created_at: datetime

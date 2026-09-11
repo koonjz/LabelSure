@@ -225,6 +225,8 @@ async def upload_scan(
             needs_manual_review=verdict.needs_manual_review,
             review_reason=verdict.review_reason,
             detected_language=lang_code,
+            raw_ocr_text=ocr_result.full_text[:4000] if ocr_result.full_text else None,
+            ocr_engine=ocr_result.engine_used,
             extracted_fields=[
                 ExtractedFieldOut(field_name=k, field_value=v, confidence=ocr_result.avg_confidence, bounding_box=None)
                 for k, v in field_map.items() if v is not None
