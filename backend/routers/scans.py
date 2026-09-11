@@ -5,10 +5,13 @@ GET  /scans           — list scans (officers see all; consumers see own)
 GET  /scans/{scan_id} — get full scan detail including rule results
 """
 from __future__ import annotations
+import logging
 import uuid
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Optional
+
+logger = logging.getLogger(__name__)
 
 from fastapi import APIRouter, Depends, File, Form, HTTPException, UploadFile, Query
 from sqlalchemy import select, func
@@ -87,7 +90,13 @@ async def upload_scan(
     # Step 1: OCR with English model
     try:
         ocr_result = run_ocr(str(image_path), lang_code="en")
-    except Exception:
+    except Exception as exc:
+        logger.error(
+            "OCR failed for image '%s': %s",
+            image_path,
+            exc,
+            exc_info=True,
+        )
         class _Empty:
             full_text = ""
             min_confidence = 0.0

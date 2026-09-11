@@ -21,28 +21,46 @@ logger = logging.getLogger(__name__)
 # Pattern catalogue (English + common Indic transliterations)
 # ─────────────────────────────────────────────────────────────────────────────
 
-# MRP patterns: "MRP Rs.45.00", "MRP ₹45", "M.R.P. ₹45.00", "MRP: 45"
+# MRP patterns: "MRP Rs.45.00", "MRP ₹45", "M.R.P. ₹45.00", "MRP: 45", "MRP ₹: 5.00"
 _MRP_PATTERN = re.compile(
     r"(?:M\.?R\.?P\.?|Maximum\s+Retail\s+Price)[:\s]*"
-    r"(?:Rs\.?|INR|₹)?\s*(\d{1,6}(?:[.,]\d{1,2})?)",
+    r"(?:Rs\.?|INR|₹)?[:\s]*"
+    r"(\d{1,6}(?:[.,]\d{1,2})?)",
     re.IGNORECASE,
 )
 
-# Net quantity patterns: "Net Wt. 500g", "Net Contents 1 kg", "500 ml", "1.5L"
+# Net quantity patterns:
+# Labelled:   "Net Wt. 500g", "Net Weight: 35g", "Net Contents 1 kg"
+# Standalone: "500 ml", "1.5L"
 _NET_QTY_PATTERN = re.compile(
-    r"(?:Net\s+(?:Wt\.?|Weight|Contents?|Quantity|Vol\.?|Volume)[\s:]*)??"
+    r"(?:Net\s+(?:Wt\.?|Weight|Contents?|Quantity|Vol\.?|Volume|Qty\.?)[\s:]*"
+    r"|NET\s+(?:WT\.?|WEIGHT|CONTENTS?|QUANTITY|VOL\.?|VOLUME|QTY\.?)[\s:]*)?"
     r"(\d+(?:[.,]\d+)?)\s*"
     r"(g(?:m(?:s)?)?|kg(?:s)?|ml|millilitre|l(?:tr?(?:e)?)?|litre|liter|pcs?|nos?|pieces?|number)",
     re.IGNORECASE,
 )
 
-# Manufacture date: "Mfg. Date: 06/2023", "Date of Mfg: Jun 2023", "MFD: 2023-06"
+# Manufacture/Packing date patterns:
+#   "Mfg. Date: 06/2023", "Date of Mfg: Jun 2023", "MFD: 2023-06"
+#   "PKD./ USE BY DATE: 30.07.22", "Packed On: 01/22", "PKD: 07/2022"
+# Also handles dual-date format: "30.07.22/29.01.23" — takes the FIRST date as manufacture.
 _MFG_DATE_PATTERN = re.compile(
-    r"(?:Mfg\.?\s*(?:Date|Dt)?\.?|Date\s+of\s+(?:Mfg|Manufacture|Mfgr|Manuf)\.?|MFD\.?|Packed\s+On)[:\s]*"
     r"(?:"
-    r"(\d{1,2})[/\-.](\d{4})"               # DD/YYYY or MM/YYYY
-    r"|(\d{4})[/\-.](\d{1,2})"               # YYYY/MM
-    r"|([A-Za-z]{3,9})[\s,]+(\d{4})"         # Mon YYYY
+    r"Mfg\.?\s*(?:Date|Dt)?\.?"
+    r"|Date\s+of\s+(?:Mfg|Manufacture|Mfgr|Manuf)\.?"
+    r"|MFD\.?"
+    r"|Packed?\s*(?:On|Date|Dt\.?)?\.?"
+    r"|PKD\.?(?:/[^:]*)?"         # PKD./ or PKD / USE BY DATE etc.
+    r"|Mfg\.?/Pkg\.?"
+    r"|Manufacturing\s+Date"
+    r"|Packing\s+Date"
+    r")[:\s]*"
+    r"(?:"
+    r"(\d{1,2})[/\-.](\d{4})"               # group 1,2: DD/YYYY or MM/YYYY  (4-digit year)
+    r"|(\d{4})[/\-.](\d{1,2})"               # group 3,4: YYYY/MM
+    r"|([A-Za-z]{3,9})[\s,]+(\d{4})"         # group 5,6: Mon YYYY
+    r"|(\d{1,2})[/\-.](\d{1,2})[/\-.](\d{2})" # group 7,8,9: DD/MM/YY (2-digit year)
+    r"|(\d{1,2})[/\-.](\d{2})"               # group 10,11: MM/YY or DD/YY (2-digit year)
     r")",
     re.IGNORECASE,
 )
@@ -157,10 +175,10 @@ def _extract_mfg_date(text: str) -> tuple[Optional[int], Optional[int]]:
     match = _MFG_DATE_PATTERN.search(text)
     if not match:
         return None, None
-    g = match.groups()
+    g = match.groups()  # 11 groups total (indices 0-10)
     try:
         if g[0] and g[1]:
-            # DD/YYYY or MM/YYYY
+            # DD/YYYY or MM/YYYY  (4-digit year)
             month_or_day = int(g[0])
             year = int(g[1])
             month = month_or_day if 1 <= month_or_day <= 12 else None
@@ -173,6 +191,22 @@ def _extract_mfg_date(text: str) -> tuple[Optional[int], Optional[int]]:
             month_str = g[4][:3].lower()
             month = _MONTH_NAMES.get(month_str)
             return month, int(g[5])
+        elif g[6] and g[7] and g[8]:
+            # DD/MM/YY — 2-digit year (e.g. 30.07.22 → July 2022)
+            day = int(g[6])
+            month = int(g[7])
+            year_2d = int(g[8])
+            # Assume 2000s for 2-digit years: 00-99 → 2000-2099
+            year = 2000 + year_2d
+            if 1 <= month <= 12:
+                return month, year
+        elif g[9] and g[10]:
+            # MM/YY or DD/YY — 2-digit year (e.g. 07/22)
+            first = int(g[9])
+            year_2d = int(g[10])
+            year = 2000 + year_2d
+            month = first if 1 <= first <= 12 else None
+            return month, year
     except (ValueError, IndexError):
         pass
     return None, None

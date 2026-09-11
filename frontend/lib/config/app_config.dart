@@ -59,10 +59,11 @@ class AppConfig {
   // ─── Connection timeouts ───────────────────────────────────────────────────
   // Longer in release (real server may be further away).
   static Duration get connectTimeout =>
-      kDebugMode ? const Duration(seconds: 15) : const Duration(seconds: 30);
+      kDebugMode ? const Duration(seconds: 30) : const Duration(seconds: 30);
 
   static Duration get receiveTimeout =>
-      kDebugMode ? const Duration(seconds: 60) : const Duration(seconds: 120);
+      // 120 s in both modes: Render free-tier backends can take ~90 s on cold start.
+      kDebugMode ? const Duration(seconds: 120) : const Duration(seconds: 120);
 
   // ─── Release build validation ─────────────────────────────────────────────
   static void _validateForRelease(String url) {

@@ -24,6 +24,9 @@ class _ScanScreenState extends State<ScanScreen> with SingleTickerProviderStateM
   File? _selectedImage;
   bool _isUploading = false;
   String? _error;
+  bool _isTimeoutError = false;
+
+  final _scrollCtrl = ScrollController();
 
   // Optional fields
   String _fontType = 'printed';
@@ -44,6 +47,7 @@ class _ScanScreenState extends State<ScanScreen> with SingleTickerProviderStateM
   void dispose() {
     _pulseCtrl.dispose();
     _salePriceCtrl.dispose();
+    _scrollCtrl.dispose();
     super.dispose();
   }
 
@@ -97,6 +101,7 @@ class _ScanScreenState extends State<ScanScreen> with SingleTickerProviderStateM
     setState(() {
       _isUploading = true;
       _error = null;
+      _isTimeoutError = false;
     });
 
     try {
@@ -115,14 +120,37 @@ class _ScanScreenState extends State<ScanScreen> with SingleTickerProviderStateM
         context.push('/scan-result', extra: scan);
       }
     } on ApiException catch (e) {
-      // ApiException already includes the URL that was tried
-      setState(() => _error = e.toString());
+      final msg = e.toString();
+      final isTimeout = msg.contains('timed out') || msg.contains('timeout');
+      setState(() {
+        _error = msg;
+        _isTimeoutError = isTimeout;
+      });
+      _scrollToError();
     } catch (e) {
-      setState(() => _error =
-          'Upload failed: ${e.toString()}\nBackend URL: ${AppConfig.baseUrl}');
+      final msg = e.toString().toLowerCase();
+      final isTimeout = msg.contains('timed out') || msg.contains('timeout');
+      setState(() {
+        _error = 'Upload failed: ${e.toString()}\nBackend URL: ${AppConfig.baseUrl}';
+        _isTimeoutError = isTimeout;
+      });
+      _scrollToError();
     } finally {
       if (mounted) setState(() => _isUploading = false);
     }
+  }
+
+  void _scrollToError() {
+    // Give the widget tree a frame to rebuild with the error widget, then scroll.
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (_scrollCtrl.hasClients) {
+        _scrollCtrl.animateTo(
+          _scrollCtrl.position.maxScrollExtent,
+          duration: const Duration(milliseconds: 350),
+          curve: Curves.easeOut,
+        );
+      }
+    });
   }
 
   @override
@@ -133,6 +161,7 @@ class _ScanScreenState extends State<ScanScreen> with SingleTickerProviderStateM
       backgroundColor: const Color(0xFF0A0F1C),
       body: SafeArea(
         child: SingleChildScrollView(
+          controller: _scrollCtrl,
           padding: const EdgeInsets.all(24),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.center,
@@ -145,7 +174,7 @@ class _ScanScreenState extends State<ScanScreen> with SingleTickerProviderStateM
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Text(
+                        const Text(
                           'Scan Label',
                           style: const TextStyle(
                             color: Colors.white,
@@ -305,22 +334,48 @@ class _ScanScreenState extends State<ScanScreen> with SingleTickerProviderStateM
               if (_error != null) ...[
                 const SizedBox(height: 16),
                 Container(
-                  padding: const EdgeInsets.all(12),
+                  padding: const EdgeInsets.all(14),
                   decoration: BoxDecoration(
                     color: const Color(0xFFEF4444).withValues(alpha: 0.1),
                     borderRadius: BorderRadius.circular(10),
                     border: Border.all(color: const Color(0xFFEF4444).withValues(alpha: 0.3)),
                   ),
-                  child: Row(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      const Icon(Icons.error_outline, color: Color(0xFFEF4444), size: 18),
-                      const SizedBox(width: 8),
-                      Expanded(
-                        child: Text(
-                          _error!,
-                          style: const TextStyle(color: Color(0xFFEF4444), fontSize: 13),
-                        ),
+                      Row(
+                        children: [
+                          const Icon(Icons.error_outline, color: Color(0xFFEF4444), size: 18),
+                          const SizedBox(width: 8),
+                          Expanded(
+                            child: Text(
+                              _error!,
+                              style: const TextStyle(color: Color(0xFFEF4444), fontSize: 13),
+                            ),
+                          ),
+                        ],
                       ),
+                      if (_isTimeoutError) ...[
+                        const SizedBox(height: 8),
+                        const Divider(color: Color(0xFFEF4444), height: 1, thickness: 0.3),
+                        const SizedBox(height: 8),
+                        const Row(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            const Icon(Icons.lightbulb_outline,
+                                color: Color(0xFFFBBF24), size: 15),
+                            const SizedBox(width: 6),
+                            const Expanded(
+                              child: Text(
+                                'Tip: The backend may be starting up (cold start can take ~90 s). '
+                                'Wait a moment and tap "Scan for Compliance" again.',
+                                style: TextStyle(
+                                    color: Color(0xFFFBBF24), fontSize: 12),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ],
                     ],
                   ),
                 ),
