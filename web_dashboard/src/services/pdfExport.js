@@ -1,5 +1,30 @@
-import jsPDF from 'jspdf';
-import 'jspdf-autotable';
+import { jsPDF } from 'jspdf';
+import autoTable from 'jspdf-autotable';
+
+/**
+ * Triggers a bulletproof browser file download for the generated jsPDF document.
+ */
+function triggerDownload(doc, filename) {
+  try {
+    const blob = doc.output('blob');
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = filename;
+    link.style.display = 'none';
+    document.body.appendChild(link);
+    link.click();
+    setTimeout(() => {
+      if (document.body.contains(link)) {
+        document.body.removeChild(link);
+      }
+      URL.revokeObjectURL(url);
+    }, 500);
+  } catch (err) {
+    console.warn('Blob download failed, using doc.save fallback:', err);
+    doc.save(filename);
+  }
+}
 
 /**
  * Generates and downloads a comprehensive LabelSure Legal Metrology Compliance PDF Report.
@@ -34,7 +59,6 @@ export function exportCompliancePdf({
   const safeGreen = [46, 125, 50];      // #2E7D32
   const alertRed = [198, 40, 40];       // #C62828
   const alertAmber = [217, 119, 6];     // #D97706
-  const darkBg = [13, 21, 39];          // #0D1527
   const textDark = [30, 41, 59];
   const textMuted = [100, 116, 139];
 
@@ -178,7 +202,7 @@ export function exportCompliancePdf({
     ];
   });
 
-  doc.autoTable({
+  autoTable(doc, {
     startY: yPos,
     head: [['#', 'Scan ID', 'Product / File', 'Verdict', 'Conf.', 'Lang', 'Timestamp', 'Compliance Findings']],
     body: tableData,
@@ -210,7 +234,6 @@ export function exportCompliancePdf({
       7: { cellWidth: 'auto' },
     },
     didParseCell: (data) => {
-      // Color-code verdict cell
       if (data.section === 'body' && data.column.index === 3) {
         const text = data.cell.raw;
         if (text === 'COMPLIANT') {
@@ -222,8 +245,7 @@ export function exportCompliancePdf({
         }
       }
     },
-    didDrawPage: (data) => {
-      // Footer on every page
+    didDrawPage: () => {
       const pageNumber = doc.internal.getCurrentPageInfo().pageNumber;
       const totalPages = doc.internal.getNumberOfPages();
 
@@ -231,12 +253,10 @@ export function exportCompliancePdf({
       doc.setFont('helvetica', 'normal');
       doc.setTextColor(...textMuted);
 
-      // Line
       doc.setDrawColor(226, 232, 240);
       doc.setLineWidth(0.5);
       doc.line(margin, pageHeight - 24, pageWidth - margin, pageHeight - 24);
 
-      // Footer text
       doc.text(
         'LabelSure Compliance Platform — Official Legal Metrology Regulatory Inspection Record',
         margin,
@@ -251,9 +271,8 @@ export function exportCompliancePdf({
     },
   });
 
-  // Download
   const filename = `labelsure_compliance_report_${now.toISOString().slice(0, 10)}.pdf`;
-  doc.save(filename);
+  triggerDownload(doc, filename);
 }
 
 /**
@@ -364,14 +383,14 @@ export function exportSingleScanPdf(scan, user = null) {
     measured_font_height_mm: 'Measured Font Height (mm)',
   };
 
-  const fields = (scan.fields || []).filter(f => f.field_value);
+  const fields = (scan.fields || scan.extracted_fields || []).filter(f => f.field_value);
   const fieldRows = fields.map(f => [
     fieldLabels[f.field_name] || f.field_name,
     f.field_value || '—',
   ]);
 
   if (fieldRows.length > 0) {
-    doc.autoTable({
+    autoTable(doc, {
       startY: yPos,
       head: [['Mandatory Field', 'Extracted Value']],
       body: fieldRows,
@@ -381,7 +400,7 @@ export function exportSingleScanPdf(scan, user = null) {
       headStyles: { fillColor: brandBlue, textColor: [255, 255, 255], fontStyle: 'bold' },
       columnStyles: { 0: { cellWidth: 160, fontStyle: 'bold' } },
     });
-    yPos = doc.lastAutoTable.finalY + 16;
+    yPos = (doc.lastAutoTable ? doc.lastAutoTable.finalY : yPos + 80) + 16;
   }
 
   // Legal Metrology Rules Check Results
@@ -403,7 +422,7 @@ export function exportSingleScanPdf(scan, user = null) {
     ];
   });
 
-  doc.autoTable({
+  autoTable(doc, {
     startY: yPos,
     head: [['Rule Name', 'Status', 'Legal Reference', 'Finding / Assessment']],
     body: ruleRows,
@@ -443,5 +462,5 @@ export function exportSingleScanPdf(scan, user = null) {
   });
 
   const filename = `labelsure_scan_${scan.id?.substring(0, 8) || 'report'}.pdf`;
-  doc.save(filename);
+  triggerDownload(doc, filename);
 }

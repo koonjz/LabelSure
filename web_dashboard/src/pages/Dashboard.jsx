@@ -68,17 +68,21 @@ export default function Dashboard({ user }) {
     try {
       let scansToExport = filtered;
       if (total > scans.length) {
-        const fullData = await api.listScans({
-          verdict: verdict || undefined,
-          page: 1,
-          pageSize: Math.min(total, 500),
-        });
-        if (fullData.items?.length) {
-          scansToExport = fullData.items.filter(s =>
-            !search ||
-            (s.image_filename || '').toLowerCase().includes(search.toLowerCase()) ||
-            (s.id || '').toLowerCase().includes(search.toLowerCase())
-          );
+        try {
+          const fullData = await api.listScans({
+            verdict: verdict || undefined,
+            page: 1,
+            pageSize: Math.min(total, 500),
+          });
+          if (fullData.items?.length) {
+            scansToExport = fullData.items.filter(s =>
+              !search ||
+              (s.image_filename || '').toLowerCase().includes(search.toLowerCase()) ||
+              (s.id || '').toLowerCase().includes(search.toLowerCase())
+            );
+          }
+        } catch (fetchErr) {
+          console.warn('Could not fetch all scans for PDF, using current page:', fetchErr);
         }
       }
 
@@ -90,14 +94,8 @@ export default function Dashboard({ user }) {
         totalCount: total,
       });
     } catch (err) {
-      console.error('PDF export fallback:', err);
-      exportCompliancePdf({
-        scans: filtered,
-        verdictFilter: verdict,
-        searchQuery: search,
-        user,
-        totalCount: total,
-      });
+      console.error('PDF export failed:', err);
+      alert(`Failed to generate PDF: ${err.message || err}`);
     } finally {
       setExporting(false);
     }
