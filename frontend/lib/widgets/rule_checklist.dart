@@ -1,7 +1,6 @@
-// LabelSure — Rule Checklist Widget
-// Displays a list of rule results with ✓/✗ icons and explanations.
 import 'package:flutter/material.dart';
 import 'package:flutter_animate/flutter_animate.dart';
+import '../config/app_theme.dart';
 import '../models/scan.dart';
 
 class RuleChecklist extends StatelessWidget {
@@ -44,10 +43,10 @@ class _RuleItemState extends State<_RuleItem> {
     final isInfo = widget.result.severity == 'info';
 
     final Color statusColor = isInfo
-        ? const Color(0xFF60A5FA)
+        ? AppColors.brandTealLight
         : passed
-            ? const Color(0xFF22C55E)
-            : const Color(0xFFEF4444);
+            ? AppColors.statusCompliant        // #2E7D32 Safe Green
+            : AppColors.statusNonCompliant;     // #C62828 Red
 
     final IconData statusIcon = isInfo
         ? Icons.info_outline_rounded
@@ -60,10 +59,10 @@ class _RuleItemState extends State<_RuleItem> {
       child: Container(
         margin: const EdgeInsets.only(bottom: 10),
         decoration: BoxDecoration(
-          color: const Color(0xFF1E293B),
-          borderRadius: BorderRadius.circular(12),
+          color: AppColors.surface,
+          borderRadius: BorderRadius.circular(14),
           border: Border.all(
-            color: statusColor.withOpacity(0.3),
+            color: statusColor.withValues(alpha: 0.35),
             width: 1,
           ),
         ),
@@ -77,7 +76,7 @@ class _RuleItemState extends State<_RuleItem> {
                     width: 36,
                     height: 36,
                     decoration: BoxDecoration(
-                      color: statusColor.withOpacity(0.15),
+                      color: statusColor.withValues(alpha: 0.15),
                       shape: BoxShape.circle,
                     ),
                     child: Icon(statusIcon, color: statusColor, size: 20),
@@ -89,8 +88,8 @@ class _RuleItemState extends State<_RuleItem> {
                       children: [
                         Text(
                           widget.result.ruleName,
-                          style: TextStyle(
-                            color: Colors.white.withOpacity(0.9),
+                          style: const TextStyle(
+                            color: Colors.white,
                             fontSize: 13,
                             fontWeight: FontWeight.w600,
                           ),
@@ -110,7 +109,7 @@ class _RuleItemState extends State<_RuleItem> {
                   ),
                   Icon(
                     _expanded ? Icons.expand_less : Icons.expand_more,
-                    color: Colors.white38,
+                    color: AppColors.textMuted,
                     size: 20,
                   ),
                 ],
@@ -122,8 +121,8 @@ class _RuleItemState extends State<_RuleItem> {
                 padding: const EdgeInsets.fromLTRB(16, 0, 16, 14),
                 child: Text(
                   widget.result.explanation!,
-                  style: TextStyle(
-                    color: Colors.white.withOpacity(0.6),
+                  style: const TextStyle(
+                    color: AppColors.textSecondary,
                     fontSize: 12,
                     height: 1.5,
                   ),

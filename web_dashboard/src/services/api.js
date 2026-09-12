@@ -57,6 +57,8 @@ export const api = {
 
   getScan: (id) => request(`/scans/${id}`),
 
+  getAnalytics: () => request('/reports/analytics'),
+
   exportUrl: (verdict, fmt = 'csv') => {
     const params = new URLSearchParams({ fmt });
     if (verdict) params.set('verdict', verdict);

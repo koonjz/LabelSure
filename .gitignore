@@ -67,3 +67,7 @@ desktop.ini
 # ─── Docker ──────────────────────────────────────────────────────────────────
 # docker-compose.override.yml can hold local overrides (also gitignored)
 docker-compose.override.yml
+
+# ─── Scratch ─────────────────────────────────────────────────────────────────
+scratch/
+

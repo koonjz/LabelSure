@@ -245,6 +245,50 @@ class TestManufacturerNameAndAddress:
         result = _extract_manufacturer_name(text)
         assert result is not None and "ABC" in result
 
+    def test_company_fallback_without_prefix(self):
+        text = "TestHarvest Foods Private Limited\nADDRESS: 101 Sample Estate, Surat, Gujarat 395010"
+        result = _extract_manufacturer_name(text)
+        assert result == "TestHarvest Foods Private Limited"
+
+
+# ── Generic / Commodity Name ─────────────────────────────────────────────────
+
+from backend.processing.field_extractor import _extract_generic_name
+
+class TestGenericName:
+    def test_explicit_commodity_name(self):
+        text = "Name of Commodity: Roasted Almonds\nNet Weight: 500 g\nMRP: Rs. 500.00"
+        assert _extract_generic_name(text, None) == "Roasted Almonds"
+
+    def test_explicit_generic_name(self):
+        text = "Generic Name: California Almonds\nNet Wt: 200g\nMRP: ₹ 300.00"
+        assert _extract_generic_name(text, None) == "California Almonds"
+
+    def test_multiline_title_merging(self):
+        text = "ROASTED\nALMONDS\nNet Weight: 500 g\nUnit Sale Price: Rs. 1.20 / g\nMRP: Rs. 500.00"
+        assert _extract_generic_name(text, None) == "ROASTED ALMONDS"
+
+
+# ── Unit Sale Price vs MRP Separation ────────────────────────────────────────
+
+class TestUSPvsMRP:
+    def test_mrp_preferred_over_earlier_usp(self):
+        text = (
+            "Net Weight: 500 g\n"
+            "Unit Sale Price: Rs. 1.20 / g\n"
+            "MRP (Incl. of all taxes): Rs. 500.00\n"
+            "Mfg Date: 01/08/2026"
+        )
+        assert _extract_mrp(text) == 500.0
+
+    def test_taali_style_usp_and_mrp(self):
+        text = (
+            "MRP ₹ (Incl. of all taxes): RS: 75.00\n"
+            "USP ₹ (per g): RS: 0.50/g\n"
+        )
+        assert _extract_mrp(text) == 75.0
+
 
 if __name__ == "__main__":
     pytest.main([__file__, "-v"])
+

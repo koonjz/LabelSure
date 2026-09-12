@@ -9,11 +9,12 @@ import 'package:image_picker/image_picker.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:provider/provider.dart';
 import '../config/app_config.dart';
+import '../config/app_theme.dart';
 import '../models/scan.dart';
 import '../services/api_service.dart';
-import '../services/auth_service.dart';
 import '../services/ocr_service.dart';
 import '../utils/permission_helper.dart';
+import '../widgets/profile_button.dart';
 
 
 class ScanScreen extends StatefulWidget {
@@ -220,132 +221,99 @@ class _ScanScreenState extends State<ScanScreen> with SingleTickerProviderStateM
 
   @override
   Widget build(BuildContext context) {
-    final auth = context.watch<AuthService>();
-
     return Scaffold(
-      backgroundColor: const Color(0xFF0A0F1C),
+      backgroundColor: AppColors.background,
       body: SafeArea(
         child: SingleChildScrollView(
           controller: _scrollCtrl,
-          padding: const EdgeInsets.all(24),
+          padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.center,
             children: [
-              const SizedBox(height: 16),
-              // Header
+              // Top Header with Title & Top-Right Profile Section
               Row(
+                crossAxisAlignment: CrossAxisAlignment.center,
                 children: [
                   Expanded(
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        const Text(
-                          'Scan Label',
-                          style: TextStyle(
-                            color: Colors.white,
-                            fontSize: 28,
-                            fontWeight: FontWeight.bold,
-                          ),
+                        Row(
+                          children: [
+                            Container(
+                              width: 32,
+                              height: 32,
+                              padding: const EdgeInsets.all(5),
+                              decoration: BoxDecoration(
+                                gradient: AppColors.brandGradient,
+                                borderRadius: BorderRadius.circular(9),
+                              ),
+                              child: Image.asset(
+                                'assets/icons/app_icon.png',
+                                fit: BoxFit.contain,
+                                errorBuilder: (_, __, ___) => const Icon(
+                                  Icons.document_scanner_rounded,
+                                  color: Colors.white,
+                                  size: 18,
+                                ),
+                              ),
+                            ),
+                            const SizedBox(width: 10),
+                            const Text(
+                              'LabelSure',
+                              style: TextStyle(
+                                color: Colors.white,
+                                fontSize: 24,
+                                fontWeight: FontWeight.bold,
+                                letterSpacing: -0.5,
+                              ),
+                            ),
+                          ],
                         ),
-                        Text(
-                          'Hello, ${auth.user?.displayName ?? 'User'}',
+                        const SizedBox(height: 4),
+                        const Text(
+                          'Legal Metrology Compliance Scanner',
                           style: TextStyle(
-                            color: Colors.white.withValues(alpha: 0.5),
-                            fontSize: 13,
+                            color: AppColors.textSecondary,
+                            fontSize: 12,
                           ),
                         ),
                       ],
                     ),
                   ),
-                  PopupMenuButton<String>(
-                    tooltip: 'Account options',
-                    icon: Container(
-                      padding: const EdgeInsets.all(10),
-                      decoration: BoxDecoration(
-                        color: Colors.white.withValues(alpha: 0.08),
-                        borderRadius: BorderRadius.circular(12),
-                      ),
-                      child: const Icon(
-                        Icons.account_circle_outlined,
-                        color: Color(0xFF3B82F6),
-                        size: 24,
-                      ),
-                    ),
-                    color: const Color(0xFF1E293B),
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(12),
-                      side: BorderSide(color: Colors.white.withValues(alpha: 0.1)),
-                    ),
-                    onSelected: (value) async {
-                      if (value == 'logout') {
-                        await auth.logout();
-                      }
-                    },
-                    itemBuilder: (context) => [
-                      PopupMenuItem(
-                        enabled: false,
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(
-                              auth.user?.displayName ?? 'User',
-                              style: const TextStyle(
-                                color: Colors.white,
-                                fontWeight: FontWeight.bold,
-                                fontSize: 14,
-                              ),
-                            ),
-                            Text(
-                              auth.user?.roleLabel ?? 'Consumer',
-                              style: TextStyle(
-                                color: Colors.white.withValues(alpha: 0.6),
-                                fontSize: 12,
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                      const PopupMenuDivider(),
-                      const PopupMenuItem(
-                        value: 'logout',
-                        child: Row(
-                          children: [
-                            Icon(Icons.logout_rounded, color: Color(0xFFEF4444), size: 18),
-                            SizedBox(width: 8),
-                            Text(
-                              'Log Out',
-                              style: TextStyle(color: Color(0xFFEF4444)),
-                            ),
-                          ],
-                        ),
-                      ),
-                    ],
-                  ),
+                  const ProfileButton(),
                 ],
               ),
-              const SizedBox(height: 32),
+              const SizedBox(height: 24),
 
-              // Image preview / capture area
+              // Image preview / capture area with Brand Viewfinder
               GestureDetector(
                 onTap: () => _showPickerSheet(),
                 child: AnimatedBuilder(
                   animation: _pulseCtrl,
                   builder: (_, child) => Container(
                     width: double.infinity,
-                    height: 280,
+                    height: 290,
                     decoration: BoxDecoration(
                       borderRadius: BorderRadius.circular(20),
                       border: Border.all(
                         color: _selectedImage != null
-                            ? const Color(0xFF3B82F6)
+                            ? AppColors.brandTeal
                             : Color.lerp(
-                                const Color(0xFF1E293B),
-                                const Color(0xFF3B82F6),
-                                _pulseCtrl.value * 0.5,
+                                AppColors.surfaceElevated,
+                                AppColors.brandTeal,
+                                _pulseCtrl.value * 0.6,
                               )!,
                         width: 2,
                       ),
-                      color: const Color(0xFF0F172A),
+                      color: AppColors.surface,
+                      boxShadow: [
+                        BoxShadow(
+                          color: Colors.black.withValues(alpha: 0.3),
+                          blurRadius: 12,
+                          offset: const Offset(0, 4),
+                        ),
+                      ],
                     ),
                     child: child,
                   ),
@@ -365,18 +333,21 @@ class _ScanScreenState extends State<ScanScreen> with SingleTickerProviderStateM
                               width: 72,
                               height: 72,
                               decoration: BoxDecoration(
-                                color: const Color(0xFF3B82F6).withValues(alpha: 0.15),
+                                color: AppColors.brandTeal.withValues(alpha: 0.15),
                                 shape: BoxShape.circle,
+                                border: Border.all(
+                                  color: AppColors.brandTeal.withValues(alpha: 0.3),
+                                ),
                               ),
                               child: const Icon(
                                 Icons.camera_alt_rounded,
-                                color: Color(0xFF3B82F6),
+                                color: AppColors.brandTealLight,
                                 size: 36,
                               ),
                             ),
                             const SizedBox(height: 16),
                             const Text(
-                              'Tap to capture label',
+                              'Tap to capture product label',
                               style: TextStyle(
                                 color: Colors.white,
                                 fontSize: 16,
@@ -384,17 +355,17 @@ class _ScanScreenState extends State<ScanScreen> with SingleTickerProviderStateM
                               ),
                             ),
                             const SizedBox(height: 6),
-                            Text(
-                              'Camera or Gallery',
+                            const Text(
+                              'Supports English & Indic packaged commodities',
                               style: TextStyle(
-                                color: Colors.white.withValues(alpha: 0.4),
-                                fontSize: 13,
+                                color: AppColors.textSecondary,
+                                fontSize: 12,
                               ),
                             ),
                           ],
                         ),
                 ),
-              ).animate().fadeIn().scale(begin: const Offset(0.95, 0.95)),
+              ).animate().fadeIn().scale(begin: const Offset(0.97, 0.97)),
 
               const SizedBox(height: 20),
 
@@ -413,7 +384,7 @@ class _ScanScreenState extends State<ScanScreen> with SingleTickerProviderStateM
                     Expanded(
                       flex: 2,
                       child: _GradientButton(
-                        label: _isUploading ? 'Scanning...' : 'Scan for Compliance',
+                        label: _isUploading ? 'Analyzing...' : 'Scan for Compliance',
                         icon: Icons.document_scanner_rounded,
                         isLoading: _isUploading,
                         onTap: _uploadScan,
@@ -439,55 +410,55 @@ class _ScanScreenState extends State<ScanScreen> with SingleTickerProviderStateM
                   ],
                 ).animate().fadeIn(delay: 100.ms),
 
-              // Optional: Sale price
-              const SizedBox(height: 24),
+              // Optional: Sale price & Font type
+              const SizedBox(height: 20),
               _ExpandableOptions(
                 salePriceCtrl: _salePriceCtrl,
                 fontType: _fontType,
                 onFontTypeChanged: (v) => setState(() => _fontType = v),
               ),
 
-              // Error
+              // Error banner
               if (_error != null) ...[
                 const SizedBox(height: 16),
                 Container(
                   padding: const EdgeInsets.all(14),
                   decoration: BoxDecoration(
-                    color: const Color(0xFFEF4444).withValues(alpha: 0.1),
-                    borderRadius: BorderRadius.circular(10),
-                    border: Border.all(color: const Color(0xFFEF4444).withValues(alpha: 0.3)),
+                    color: AppColors.statusNonCompliantBg,
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border.all(color: AppColors.statusNonCompliantBorder),
                   ),
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Row(
                         children: [
-                          const Icon(Icons.error_outline, color: Color(0xFFEF4444), size: 18),
+                          const Icon(Icons.error_outline_rounded, color: AppColors.statusNonCompliantLight, size: 18),
                           const SizedBox(width: 8),
                           Expanded(
                             child: Text(
                               _error!,
-                              style: const TextStyle(color: Color(0xFFEF4444), fontSize: 13),
+                              style: const TextStyle(color: AppColors.statusNonCompliantLight, fontSize: 13),
                             ),
                           ),
                         ],
                       ),
                       if (_isTimeoutError) ...[
                         const SizedBox(height: 8),
-                        const Divider(color: Color(0xFFEF4444), height: 1, thickness: 0.3),
+                        Divider(color: AppColors.statusNonCompliantBorder, height: 1, thickness: 0.5),
                         const SizedBox(height: 8),
                         const Row(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
-                            Icon(Icons.lightbulb_outline,
-                                color: Color(0xFFFBBF24), size: 15),
+                            Icon(Icons.lightbulb_outline_rounded,
+                                color: AppColors.statusReviewLight, size: 15),
                             SizedBox(width: 6),
                             Expanded(
                               child: Text(
-                                'Tip: The backend may be starting up (cold start can take ~90 s). '
-                                'Wait a moment and tap "Scan for Compliance" again.',
+                                'Tip: The backend may be warming up from cold start (~60-90s). '
+                                'Please try scanning again in a moment.',
                                 style: TextStyle(
-                                    color: Color(0xFFFBBF24), fontSize: 12),
+                                    color: AppColors.statusReviewLight, fontSize: 12),
                               ),
                             ),
                           ],
@@ -498,7 +469,7 @@ class _ScanScreenState extends State<ScanScreen> with SingleTickerProviderStateM
                 ),
               ],
 
-              const SizedBox(height: 40),
+              const SizedBox(height: 32),
             ],
           ),
         ),
@@ -509,9 +480,9 @@ class _ScanScreenState extends State<ScanScreen> with SingleTickerProviderStateM
   void _showPickerSheet() {
     showModalBottomSheet(
       context: context,
-      backgroundColor: const Color(0xFF1E293B),
+      backgroundColor: AppColors.surface,
       shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
       ),
       builder: (_) => Padding(
         padding: const EdgeInsets.all(24),
@@ -531,13 +502,13 @@ class _ScanScreenState extends State<ScanScreen> with SingleTickerProviderStateM
               leading: Container(
                 padding: const EdgeInsets.all(10),
                 decoration: BoxDecoration(
-                  color: const Color(0xFF3B82F6).withValues(alpha: 0.15),
+                  color: AppColors.brandBlue.withValues(alpha: 0.15),
                   borderRadius: BorderRadius.circular(10),
                 ),
-                child: const Icon(Icons.camera_alt_rounded, color: Color(0xFF3B82F6)),
+                child: const Icon(Icons.camera_alt_rounded, color: AppColors.brandBlueLight),
               ),
-              title: const Text('Camera', style: TextStyle(color: Colors.white)),
-              subtitle: const Text('Take a new photo', style: TextStyle(color: Colors.white54)),
+              title: const Text('Camera', style: TextStyle(color: Colors.white, fontWeight: FontWeight.w600)),
+              subtitle: const Text('Take a photo of product label', style: TextStyle(color: AppColors.textSecondary)),
               onTap: () {
                 Navigator.pop(context);
                 _pickImage(ImageSource.camera);
@@ -547,13 +518,13 @@ class _ScanScreenState extends State<ScanScreen> with SingleTickerProviderStateM
               leading: Container(
                 padding: const EdgeInsets.all(10),
                 decoration: BoxDecoration(
-                  color: const Color(0xFF8B5CF6).withValues(alpha: 0.15),
+                  color: AppColors.brandTeal.withValues(alpha: 0.15),
                   borderRadius: BorderRadius.circular(10),
                 ),
-                child: const Icon(Icons.photo_library_rounded, color: Color(0xFF8B5CF6)),
+                child: const Icon(Icons.photo_library_rounded, color: AppColors.brandTealLight),
               ),
-              title: const Text('Gallery', style: TextStyle(color: Colors.white)),
-              subtitle: const Text('Choose existing photo', style: TextStyle(color: Colors.white54)),
+              title: const Text('Gallery', style: TextStyle(color: Colors.white, fontWeight: FontWeight.w600)),
+              subtitle: const Text('Choose an image from gallery', style: TextStyle(color: AppColors.textSecondary)),
               onTap: () {
                 Navigator.pop(context);
                 _pickImage(ImageSource.gallery);
@@ -587,13 +558,11 @@ class _GradientButton extends StatelessWidget {
       height: 52,
       child: DecoratedBox(
         decoration: BoxDecoration(
-          gradient: const LinearGradient(
-            colors: [Color(0xFF3B82F6), Color(0xFF8B5CF6)],
-          ),
+          gradient: AppColors.brandGradientHorizontal,
           borderRadius: BorderRadius.circular(14),
           boxShadow: [
             BoxShadow(
-              color: const Color(0xFF3B82F6).withValues(alpha: 0.3),
+              color: AppColors.brandBlue.withValues(alpha: 0.35),
               blurRadius: 12,
               offset: const Offset(0, 4),
             ),
@@ -643,11 +612,12 @@ class _OutlineButton extends StatelessWidget {
         onPressed: onTap,
         style: OutlinedButton.styleFrom(
           foregroundColor: Colors.white,
-          side: BorderSide(color: Colors.white.withValues(alpha: 0.2)),
+          side: BorderSide(color: AppColors.borderSubtle),
+          backgroundColor: AppColors.surface,
           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
         ),
-        icon: Icon(icon, size: 20),
-        label: Text(label, style: const TextStyle(fontSize: 14)),
+        icon: Icon(icon, color: AppColors.brandTealLight, size: 20),
+        label: Text(label, style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w600)),
       ),
     );
   }
@@ -675,22 +645,22 @@ class _ExpandableOptionsState extends State<_ExpandableOptions> {
   Widget build(BuildContext context) {
     return Container(
       decoration: BoxDecoration(
-        color: const Color(0xFF1E293B),
+        color: AppColors.surface,
         borderRadius: BorderRadius.circular(14),
-        border: Border.all(color: Colors.white.withValues(alpha: 0.08)),
+        border: Border.all(color: AppColors.borderSubtle),
       ),
       child: Column(
         children: [
           ListTile(
             onTap: () => setState(() => _expanded = !_expanded),
-            leading: const Icon(Icons.tune_rounded, color: Color(0xFF60A5FA), size: 20),
+            leading: const Icon(Icons.tune_rounded, color: AppColors.brandTealLight, size: 20),
             title: const Text(
-              'Optional: Extra Details',
-              style: TextStyle(color: Colors.white, fontSize: 14),
+              'Optional: Extra Compliance Checks',
+              style: TextStyle(color: Colors.white, fontSize: 13, fontWeight: FontWeight.w600),
             ),
             trailing: Icon(
               _expanded ? Icons.expand_less : Icons.expand_more,
-              color: Colors.white38,
+              color: AppColors.textMuted,
             ),
           ),
           if (_expanded)
@@ -704,36 +674,40 @@ class _ExpandableOptionsState extends State<_ExpandableOptions> {
                     keyboardType: TextInputType.number,
                     style: const TextStyle(color: Colors.white),
                     decoration: InputDecoration(
-                      labelText: 'Sale Price (₹) — for MRP check',
-                      labelStyle: TextStyle(color: Colors.white.withValues(alpha: 0.5), fontSize: 13),
-                      prefixIcon: const Icon(Icons.currency_rupee, color: Colors.white38, size: 18),
+                      labelText: 'Actual Charged Sale Price (₹)',
+                      labelStyle: const TextStyle(color: AppColors.textSecondary, fontSize: 13),
+                      prefixIcon: const Icon(Icons.currency_rupee_rounded, color: AppColors.textMuted, size: 18),
                       filled: true,
-                      fillColor: Colors.white.withValues(alpha: 0.05),
+                      fillColor: AppColors.surfaceSubtle,
                       border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
                       enabledBorder: OutlineInputBorder(
                         borderRadius: BorderRadius.circular(10),
-                        borderSide: BorderSide(color: Colors.white.withValues(alpha: 0.1)),
+                        borderSide: BorderSide(color: AppColors.borderSubtle),
+                      ),
+                      focusedBorder: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(10),
+                        borderSide: const BorderSide(color: AppColors.brandTeal),
                       ),
                       contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
                     ),
                   ),
-                  const SizedBox(height: 12),
-                  Text(
-                    'Font Type',
-                    style: TextStyle(color: Colors.white.withValues(alpha: 0.5), fontSize: 12),
+                  const SizedBox(height: 14),
+                  const Text(
+                    'Label Font Type',
+                    style: TextStyle(color: AppColors.textSecondary, fontSize: 12, fontWeight: FontWeight.w500),
                   ),
                   const SizedBox(height: 8),
                   Row(
                     children: [
                       _FontTypeChip(
-                        label: 'Printed',
+                        label: 'Printed (Standard)',
                         value: 'printed',
                         selected: widget.fontType,
                         onTap: () => widget.onFontTypeChanged('printed'),
                       ),
                       const SizedBox(width: 8),
                       _FontTypeChip(
-                        label: 'Embossed/Moulded',
+                        label: 'Embossed / Moulded',
                         value: 'embossed',
                         selected: widget.fontType,
                         onTap: () => widget.onFontTypeChanged('embossed'),
@@ -764,20 +738,21 @@ class _FontTypeChip extends StatelessWidget {
     return GestureDetector(
       onTap: onTap,
       child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
         decoration: BoxDecoration(
           color: isSelected
-              ? const Color(0xFF3B82F6).withValues(alpha: 0.2)
-              : Colors.white.withValues(alpha: 0.05),
+              ? AppColors.brandBlue.withValues(alpha: 0.25)
+              : AppColors.surfaceSubtle,
           borderRadius: BorderRadius.circular(8),
           border: Border.all(
-            color: isSelected ? const Color(0xFF3B82F6) : Colors.white.withValues(alpha: 0.1),
+            color: isSelected ? AppColors.brandBlueLight : AppColors.borderSubtle,
           ),
         ),
         child: Text(
           label,
           style: TextStyle(
-            color: isSelected ? const Color(0xFF3B82F6) : Colors.white54,
+            color: isSelected ? Colors.white : AppColors.textSecondary,
+            fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
             fontSize: 12,
           ),
         ),

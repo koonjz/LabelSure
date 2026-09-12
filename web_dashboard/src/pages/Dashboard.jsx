@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { api } from '../services/api';
+import { exportCompliancePdf } from '../services/pdfExport';
 import ScanDetail from './ScanDetail';
 
 const VERDICTS = ['COMPLIANT', 'NON_COMPLIANT', 'NEEDS_REVIEW'];
@@ -41,6 +42,7 @@ export default function Dashboard({ user }) {
   const [search, setSearch] = useState('');
   const [page, setPage] = useState(1);
   const [selectedScanId, setSelectedScanId] = useState(null);
+  const [exporting, setExporting] = useState(false);
   const PAGE_SIZE = 20;
 
   useEffect(() => {
@@ -61,6 +63,46 @@ export default function Dashboard({ user }) {
     }
   }
 
+  async function handleExportPdf() {
+    setExporting(true);
+    try {
+      let scansToExport = filtered;
+      if (total > scans.length) {
+        const fullData = await api.listScans({
+          verdict: verdict || undefined,
+          page: 1,
+          pageSize: Math.min(total, 500),
+        });
+        if (fullData.items?.length) {
+          scansToExport = fullData.items.filter(s =>
+            !search ||
+            (s.image_filename || '').toLowerCase().includes(search.toLowerCase()) ||
+            (s.id || '').toLowerCase().includes(search.toLowerCase())
+          );
+        }
+      }
+
+      exportCompliancePdf({
+        scans: scansToExport,
+        verdictFilter: verdict,
+        searchQuery: search,
+        user,
+        totalCount: total,
+      });
+    } catch (err) {
+      console.error('PDF export fallback:', err);
+      exportCompliancePdf({
+        scans: filtered,
+        verdictFilter: verdict,
+        searchQuery: search,
+        user,
+        totalCount: total,
+      });
+    } finally {
+      setExporting(false);
+    }
+  }
+
   // Stats derived from current page
   const compliantCount = scans.filter(s => s.verdict === 'COMPLIANT').length;
   const nonCompliantCount = scans.filter(s => s.verdict === 'NON_COMPLIANT').length;
@@ -77,7 +119,7 @@ export default function Dashboard({ user }) {
   const formatDate = (d) => d ? new Date(d).toLocaleString('en-IN', { dateStyle: 'medium', timeStyle: 'short' }) : '—';
 
   if (selectedScanId) {
-    return <ScanDetail scanId={selectedScanId} onBack={() => setSelectedScanId(null)} />;
+    return <ScanDetail scanId={selectedScanId} onBack={() => setSelectedScanId(null)} user={user} />;
   }
 
   return (
@@ -116,14 +158,15 @@ export default function Dashboard({ user }) {
           ))}
         </select>
         <button id="refresh-btn" className="btn btn-outline" onClick={() => load()}>⟳ Refresh</button>
-        <a
-          id="export-btn"
+        <button
+          id="export-pdf-btn"
           className="btn btn-export"
-          href={api.exportUrl(verdict || undefined)}
-          download="labelsure_report.csv"
+          onClick={handleExportPdf}
+          disabled={exporting || loading || filtered.length === 0}
+          title="Export complete compliance report as PDF"
         >
-          ⬇ Export CSV
-        </a>
+          {exporting ? '⏳ Generating PDF...' : '📄 Export PDF'}
+        </button>
       </div>
 
       {/* Table */}

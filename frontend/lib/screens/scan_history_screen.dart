@@ -1,11 +1,12 @@
-// LabelSure — Scan History Screen (Officer role only shows full list)
 import 'package:flutter/material.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
+import '../config/app_theme.dart';
 import '../models/scan.dart';
 import '../services/api_service.dart';
 import '../services/auth_service.dart';
+import '../widgets/profile_button.dart';
 import '../widgets/scan_card.dart';
 
 class ScanHistoryScreen extends StatefulWidget {
@@ -74,7 +75,7 @@ class _ScanHistoryScreenState extends State<ScanHistoryScreen> {
     final isOfficer = auth.isOfficer;
 
     return Scaffold(
-      backgroundColor: const Color(0xFF0A0F1C),
+      backgroundColor: AppColors.background,
       body: SafeArea(
         child: Column(
           children: [
@@ -93,12 +94,14 @@ class _ScanHistoryScreenState extends State<ScanHistoryScreen> {
                             color: Colors.white,
                             fontSize: 26,
                             fontWeight: FontWeight.bold,
+                            letterSpacing: -0.5,
                           ),
                         ),
+                        const SizedBox(height: 2),
                         Text(
-                          '$_total scan${_total != 1 ? 's' : ''} found',
-                          style: TextStyle(
-                            color: Colors.white.withOpacity(0.45),
+                          '$_total scan${_total != 1 ? 's' : ''} recorded',
+                          style: const TextStyle(
+                            color: AppColors.textSecondary,
                             fontSize: 13,
                           ),
                         ),
@@ -107,14 +110,16 @@ class _ScanHistoryScreenState extends State<ScanHistoryScreen> {
                   ),
                   if (isOfficer)
                     IconButton(
-                      icon: const Icon(Icons.download_rounded, color: Color(0xFF60A5FA)),
+                      icon: const Icon(Icons.download_rounded, color: AppColors.brandTealLight),
                       tooltip: 'Export CSV',
                       onPressed: _exportCsv,
                     ),
                   IconButton(
-                    icon: const Icon(Icons.refresh_rounded, color: Colors.white54),
+                    icon: const Icon(Icons.refresh_rounded, color: AppColors.textMuted),
                     onPressed: () => _load(reset: true),
                   ),
+                  const SizedBox(width: 4),
+                  const ProfileButton(),
                 ],
               ),
             ),
@@ -129,6 +134,7 @@ class _ScanHistoryScreenState extends State<ScanHistoryScreen> {
                       _FilterChip(
                         label: 'All',
                         selected: _verdictFilter == null,
+                        color: AppColors.brandTealLight,
                         onTap: () {
                           setState(() => _verdictFilter = null);
                           _load(reset: true);
@@ -138,7 +144,7 @@ class _ScanHistoryScreenState extends State<ScanHistoryScreen> {
                       _FilterChip(
                         label: 'Compliant',
                         selected: _verdictFilter == 'COMPLIANT',
-                        color: const Color(0xFF22C55E),
+                        color: AppColors.statusCompliant,
                         onTap: () {
                           setState(() => _verdictFilter = 'COMPLIANT');
                           _load(reset: true);
@@ -148,7 +154,7 @@ class _ScanHistoryScreenState extends State<ScanHistoryScreen> {
                       _FilterChip(
                         label: 'Non-Compliant',
                         selected: _verdictFilter == 'NON_COMPLIANT',
-                        color: const Color(0xFFEF4444),
+                        color: AppColors.statusNonCompliant,
                         onTap: () {
                           setState(() => _verdictFilter = 'NON_COMPLIANT');
                           _load(reset: true);
@@ -158,7 +164,7 @@ class _ScanHistoryScreenState extends State<ScanHistoryScreen> {
                       _FilterChip(
                         label: 'Needs Review',
                         selected: _verdictFilter == 'NEEDS_REVIEW',
-                        color: const Color(0xFFF59E0B),
+                        color: AppColors.statusReview,
                         onTap: () {
                           setState(() => _verdictFilter = 'NEEDS_REVIEW');
                           _load(reset: true);
@@ -173,23 +179,27 @@ class _ScanHistoryScreenState extends State<ScanHistoryScreen> {
             Expanded(
               child: _isLoading && _scans.isEmpty
                   ? const Center(
-                      child: CircularProgressIndicator(color: Color(0xFF3B82F6)))
+                      child: CircularProgressIndicator(color: AppColors.brandTealLight))
                   : _error != null && _scans.isEmpty
                       ? Center(
                           child: Column(
                             mainAxisSize: MainAxisSize.min,
                             children: [
-                              const Icon(Icons.error_outline,
-                                  color: Color(0xFFEF4444), size: 48),
+                              const Icon(Icons.error_outline_rounded,
+                                  color: AppColors.statusNonCompliantLight, size: 48),
                               const SizedBox(height: 12),
                               Text(
                                 _error!,
-                                style: const TextStyle(color: Colors.white54),
+                                style: const TextStyle(color: AppColors.textSecondary),
                                 textAlign: TextAlign.center,
                               ),
                               const SizedBox(height: 16),
                               ElevatedButton(
                                 onPressed: () => _load(reset: true),
+                                style: ElevatedButton.styleFrom(
+                                  backgroundColor: AppColors.brandBlue,
+                                  foregroundColor: Colors.white,
+                                ),
                                 child: const Text('Retry'),
                               ),
                             ],
@@ -202,21 +212,21 @@ class _ScanHistoryScreenState extends State<ScanHistoryScreen> {
                                 children: [
                                   Icon(
                                     Icons.document_scanner_outlined,
-                                    color: Colors.white.withOpacity(0.2),
+                                    color: AppColors.textMuted.withValues(alpha: 0.5),
                                     size: 64,
                                   ),
                                   const SizedBox(height: 16),
-                                  Text(
-                                    'No scans yet',
+                                  const Text(
+                                    'No scans recorded yet',
                                     style: TextStyle(
-                                        color: Colors.white.withOpacity(0.4),
+                                        color: AppColors.textSecondary,
                                         fontSize: 16),
                                   ),
                                 ],
                               ),
                             )
                           : RefreshIndicator(
-                              color: const Color(0xFF3B82F6),
+                              color: AppColors.brandTealLight,
                               onRefresh: () => _load(reset: true),
                               child: ListView.builder(
                                 padding:
@@ -250,11 +260,15 @@ class _ScanHistoryScreenState extends State<ScanHistoryScreen> {
   void _exportCsv() {
     final api = context.read<ApiService>();
     final url = api.exportReportUrl(verdict: _verdictFilter);
-    // In a real app, launch the URL with url_launcher
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
-        content: Text('Export URL: $url'),
-        action: SnackBarAction(label: 'Copy', onPressed: () {}),
+        backgroundColor: AppColors.surfaceElevated,
+        content: Text('Export URL: $url', style: const TextStyle(color: Colors.white)),
+        action: SnackBarAction(
+          label: 'Copy',
+          textColor: AppColors.brandTealLight,
+          onPressed: () {},
+        ),
       ),
     );
   }
@@ -275,23 +289,23 @@ class _FilterChip extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final c = color ?? const Color(0xFF3B82F6);
+    final c = color ?? AppColors.brandTealLight;
     return GestureDetector(
       onTap: onTap,
       child: AnimatedContainer(
         duration: 200.ms,
         padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
         decoration: BoxDecoration(
-          color: selected ? c.withOpacity(0.2) : const Color(0xFF1E293B),
+          color: selected ? c.withValues(alpha: 0.2) : AppColors.surface,
           borderRadius: BorderRadius.circular(20),
           border: Border.all(
-            color: selected ? c : Colors.white.withOpacity(0.1),
+            color: selected ? c : AppColors.borderSubtle,
           ),
         ),
         child: Text(
           label,
           style: TextStyle(
-            color: selected ? c : Colors.white54,
+            color: selected ? c : AppColors.textSecondary,
             fontSize: 12,
             fontWeight: selected ? FontWeight.bold : FontWeight.normal,
           ),
@@ -313,8 +327,8 @@ class _LoadMoreButton extends StatelessWidget {
         child: OutlinedButton(
           onPressed: onTap,
           style: OutlinedButton.styleFrom(
-            foregroundColor: const Color(0xFF60A5FA),
-            side: const BorderSide(color: Color(0xFF60A5FA)),
+            foregroundColor: AppColors.brandTealLight,
+            side: const BorderSide(color: AppColors.brandTealLight),
             shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
           ),
           child: const Text('Load More'),

@@ -1,7 +1,6 @@
-// LabelSure — Scan Card Widget
-// Used in the Scan History list.
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
+import '../config/app_theme.dart';
 import '../models/scan.dart';
 
 class ScanCard extends StatelessWidget {
@@ -20,24 +19,17 @@ class ScanCard extends StatelessWidget {
       child: Container(
         margin: const EdgeInsets.only(bottom: 12),
         decoration: BoxDecoration(
-          gradient: LinearGradient(
-            colors: [
-              const Color(0xFF1E293B),
-              const Color(0xFF0F172A),
-            ],
-            begin: Alignment.topLeft,
-            end: Alignment.bottomRight,
-          ),
+          color: AppColors.surface,
           borderRadius: BorderRadius.circular(16),
           border: Border.all(
-            color: config.color.withOpacity(0.25),
+            color: config.color.withValues(alpha: 0.3),
             width: 1,
           ),
           boxShadow: [
             BoxShadow(
-              color: Colors.black.withOpacity(0.3),
-              blurRadius: 8,
-              offset: const Offset(0, 4),
+              color: Colors.black.withValues(alpha: 0.25),
+              blurRadius: 10,
+              offset: const Offset(0, 3),
             ),
           ],
         ),
@@ -47,14 +39,14 @@ class ScanCard extends StatelessWidget {
             children: [
               // Verdict indicator
               Container(
-                width: 52,
-                height: 52,
+                width: 48,
+                height: 48,
                 decoration: BoxDecoration(
-                  color: config.color.withOpacity(0.15),
+                  color: config.color.withValues(alpha: 0.15),
                   shape: BoxShape.circle,
-                  border: Border.all(color: config.color.withOpacity(0.4)),
+                  border: Border.all(color: config.color.withValues(alpha: 0.4)),
                 ),
-                child: Icon(config.icon, color: config.color, size: 26),
+                child: Icon(config.icon, color: config.color, size: 24),
               ),
               const SizedBox(width: 14),
               // Info
@@ -72,7 +64,7 @@ class ScanCard extends StatelessWidget {
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
                     ),
-                    const SizedBox(height: 4),
+                    const SizedBox(height: 6),
                     Row(
                       children: [
                         _Chip(
@@ -81,22 +73,22 @@ class ScanCard extends StatelessWidget {
                         ),
                         if (scan.needsManualReview) ...[
                           const SizedBox(width: 6),
-                          _Chip(label: 'REVIEW', color: const Color(0xFFF59E0B)),
+                          const _Chip(label: 'REVIEW', color: AppColors.statusReviewLight),
                         ],
                         if (scan.detectedLanguage != null && scan.detectedLanguage != 'en') ...[
                           const SizedBox(width: 6),
                           _Chip(
                             label: scan.detectedLanguage!.toUpperCase(),
-                            color: const Color(0xFF60A5FA),
+                            color: AppColors.brandTealLight,
                           ),
                         ],
                       ],
                     ),
-                    const SizedBox(height: 4),
+                    const SizedBox(height: 6),
                     Text(
                       DateFormat('dd MMM yyyy, hh:mm a').format(scan.createdAt.toLocal()),
-                      style: TextStyle(
-                        color: Colors.white.withOpacity(0.45),
+                      style: const TextStyle(
+                        color: AppColors.textMuted,
                         fontSize: 11,
                       ),
                     ),
@@ -111,21 +103,21 @@ class ScanCard extends StatelessWidget {
                       '${(scan.overallConfidence! * 100).toStringAsFixed(0)}%',
                       style: TextStyle(
                         color: config.color,
-                        fontSize: 16,
+                        fontSize: 15,
                         fontWeight: FontWeight.bold,
                       ),
                     ),
-                    Text(
+                    const Text(
                       'OCR',
                       style: TextStyle(
-                        color: Colors.white.withOpacity(0.4),
+                        color: AppColors.textMuted,
                         fontSize: 10,
                       ),
                     ),
                   ],
                 ),
               const SizedBox(width: 8),
-              Icon(Icons.chevron_right, color: Colors.white24, size: 20),
+              const Icon(Icons.chevron_right_rounded, color: AppColors.textMuted, size: 20),
             ],
           ),
         ),
@@ -136,18 +128,18 @@ class ScanCard extends StatelessWidget {
   _VerdictConfig _verdictConfig(String verdict) {
     switch (verdict) {
       case 'COMPLIANT':
-        return _VerdictConfig(
-          color: const Color(0xFF22C55E),
+        return const _VerdictConfig(
+          color: AppColors.statusCompliant,          // #2E7D32 Safe Green
           icon: Icons.verified_rounded,
         );
       case 'NON_COMPLIANT':
-        return _VerdictConfig(
-          color: const Color(0xFFEF4444),
+        return const _VerdictConfig(
+          color: AppColors.statusNonCompliant,       // #C62828 Red
           icon: Icons.cancel_rounded,
         );
       default:
-        return _VerdictConfig(
-          color: const Color(0xFFF59E0B),
+        return const _VerdictConfig(
+          color: AppColors.statusReview,             // #D97706 Amber
           icon: Icons.help_outline_rounded,
         );
     }
@@ -170,9 +162,9 @@ class _Chip extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
       decoration: BoxDecoration(
-        color: color.withOpacity(0.15),
+        color: color.withValues(alpha: 0.15),
         borderRadius: BorderRadius.circular(6),
-        border: Border.all(color: color.withOpacity(0.3)),
+        border: Border.all(color: color.withValues(alpha: 0.3)),
       ),
       child: Text(
         label,

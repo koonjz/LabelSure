@@ -21,11 +21,17 @@ logger = logging.getLogger(__name__)
 # Pattern catalogue (English + common Indic transliterations)
 # ─────────────────────────────────────────────────────────────────────────────
 
+# Rate denominator pattern (e.g. / g, / kg, / ml, per g, per piece)
+_RATE_DENOMINATOR_PATTERN = (
+    r"(?:/|per)\s*(?:g(?:m(?:s)?)?|kg(?:s)?|ml|millilitre|l(?:tr?(?:e)?)?|litre|liter|pcs?|nos?|pieces?|number|pack|unit|item|serv(?:ing)?)\b"
+)
+
 # MRP patterns:
 # Priority 1: Labelled MRP (explicit declaration on the label)
 # Handles: "MRP ₹150/-", "MRP : 150", "M.R.P. : ₹150.00", "MRP ₹: 5.00"
 #          "MRP (incl. of all taxes) : 150", "MRP Rs. 20.00", "MRP ₹: 5.00 (Incl. of all taxes)"
-#          "MRP. 250/-", "M R P : 18", "M.R.P Rs 25/-", "MRP: 5"
+#          "MRP. 250/-", "M R P : 18", "M.R.P Rs 25/-", "MRP: 5", "Maximum Retail Price: Rs 500"
+#          "MRP ₹ (Incl. of all taxes): RS: 75.00"
 _LABELLED_MRP_PATTERN = re.compile(
     r"(?:"
     r"M\.?\s*R\.?\s*P\.?"                      # MRP, M.R.P., M R P, M. R. P.
@@ -34,22 +40,40 @@ _LABELLED_MRP_PATTERN = re.compile(
     r"|Max(?:imum|\.)?\s+Retail\s+Price"       # Maximum Retail Price
     r"|Max\.?\s*Ret\.?\s*Price"                # Max. Ret. Price
     r"|Retail\s+Price"                         # Retail Price
-    r"|(?<!\w)Price(?!\s*:\s*\w{10,})"        # Lone "Price" keyword
     r")"
-    r"(?:\s*\([^)]*(?:tax|all|incl)[^)]*\))?"  # Optional (Incl. of all taxes) before amount
+    r"(?:\s*(?:Rs\.?|INR|₹|Re\.?|[?*`'~^|\\/])?\s*\(?[^)\n]*(?:tax|all|incl)[^)\n]*\)?)?"  # Optional (Incl. of all taxes)
     r"[:\s\-._]*"                              # Separators
     r"(?:Rs\.?|INR|₹|Re\.?|[?*`'~^|\\/])?"    # Optional currency symbol or OCR artifact
     r"[:\s\-._]*"                              # Secondary separators
     r"(\d{1,6}(?:\s*[.,]\s*\d{1,2})?)"        # Numerical amount (GROUP 1)
+    r"(?!\s*" + _RATE_DENOMINATOR_PATTERN + r")"  # Must NOT be followed by rate denominator (/ g, per g, etc.)
     r"(?:\s*(?:/\s*-|/-|\([^)]*(?:tax|all|incl)[^)]*\)|\b))",  # Optional /- or (Incl. of all taxes) after
     re.IGNORECASE,
 )
 
-# Priority 2: Standalone currency price fallback (e.g. "₹ 150/-", "Rs. 150/-", "₹: 5.00", "₹5.00")
-_STANDALONE_PRICE_PATTERN = re.compile(
-    r"(?:Rs\.?|INR|₹|Re\.?)\s*[:\-._]?\s*(\d{1,6}(?:\s*[.,]\s*\d{1,2})?)\s*(?:/\s*-|/-|\b)",
+# Priority 2: Generic total/package price fallback (e.g. "Total Price: Rs. 250", "Price: Rs. 500")
+_GENERIC_PRICE_PATTERN = re.compile(
+    r"\b(?:Total\s+Price|Net\s+Price|Package\s+Price|Price\s*[:\-])"
+    r"(?:\s*\(?[^)\n]*(?:tax|all|incl)[^)\n]*\)?)?"
+    r"[:\s\-._]*"
+    r"(?:Rs\.?|INR|₹|Re\.?|[?*`'~^|\\/])?"
+    r"[:\s\-._]*"
+    r"(\d{1,6}(?:\s*[.,]\s*\d{1,2})?)"
+    r"(?!\s*" + _RATE_DENOMINATOR_PATTERN + r")"
+    r"(?:\s*(?:/\s*-|/-|\([^)]*(?:tax|all|incl)[^)]*\)|\b))",
     re.IGNORECASE,
 )
+
+# Priority 3: Standalone currency price fallback (e.g. "₹ 150/-", "Rs. 150/-", "₹: 5.00", "₹5.00")
+_STANDALONE_PRICE_PATTERN = re.compile(
+    r"(?:Rs\.?|INR|₹|Re\.?)\s*[:\-._]?\s*(\d{1,6}(?:\s*[.,]\s*\d{1,2})?)"
+    r"(?!\s*" + _RATE_DENOMINATOR_PATTERN + r")"
+    r"\s*(?:/\s*-|/-|\b)",
+    re.IGNORECASE,
+)
+
+_USP_LINE_INDICATORS = ("unit sale price", "unit price", "usp", "u.s.p.", "price per", "rate/")
+
 
 
 # Net quantity patterns:
@@ -256,21 +280,69 @@ _PHONE_PATTERN = re.compile(
     re.IGNORECASE,
 )
 
-# Country of origin
-_COUNTRY_ORIGIN_PATTERN = re.compile(
-    r"(?:Country\s+of\s+(?:Origin|Mfg\.?)|Made\s+in|Product\s+of)[:\s\-._]*"
-    r"([A-Za-z\s]{3,30}?)"
-    r"(?=\n|\.|,|$)",
+# Explicit Product / Commodity Name patterns
+# Matches: "Name of Commodity: Roasted Almonds", "Generic Name: Roasted Salted Almonds",
+#          "Commodity: Almonds", "Product Name: California Almonds", "Product: Roasted Almonds"
+_COMMODITY_DECLARATION_PATTERN = re.compile(
+    r"(?:Name\s+of\s+(?:the\s+)?Commodity"
+    r"|Generic\s+Name"
+    r"|Name\s+of\s+(?:the\s+)?Product"
+    r"|Product\s+Name"
+    r"|Commodity"
+    r"|Product"
+    r"|Item\s+Name"
+    r"|Item"
+    r"|Article)[:\s\-._]*"
+    r"([A-Za-z0-9\s\-&',()]+?)"
+    r"(?=\n|$|\.\s*(?:MRP|Net|Mfg|Date|Batch|LOT|PKD|Packed|fssai|Lic|Store|Customer|Consumer|Manufactured|Marketed))",
     re.IGNORECASE,
 )
 
+# Company entity recognition (for manufacturer fallback)
+_COMPANY_LEGAL_SUFFIXES = [
+    r"Pvt\.?\s*Ltd\.?",
+    r"Private\s+Limited",
+    r"Ltd\.?",
+    r"Limited",
+    r"LLP",
+    r"L\.L\.P\.?",
+    r"Industries",
+    r"Enterprises",
+    r"Beverages",
+    r"Laboratories",
+    r"Pharma",
+    r"Packers",
+    r"Naturals",
+    r"Herbals",
+    r"Foods",
+    r"Agro",
+    r"Organics",
+    r"Products",
+    r"Confectionery",
+]
+
+_COMPANY_CHECK_REGEX = re.compile(
+    r"\b(?:" + "|".join(_COMPANY_LEGAL_SUFFIXES) + r")\b",
+    re.IGNORECASE,
+)
+
+_IGNORED_COMPANY_LINE_KEYWORDS = {
+    "nutrition", "ingredients", "mrp", "net wt", "net weight", "batch", "pkd",
+    "mfg date", "best before", "expiry", "fssai", "customer care", "consumer care",
+    "email", "phone", "website", "address:", "address :",
+}
+
 _IGNORED_PRODUCT_KEYWORDS = {
-    "nutrition", "nutritional", "ingredients", "net weight", "net wt", "mrp", "batch",
-    "packed on", "mfg date", "best before", "fssai", "store in", "calories", "keep in",
-    "customer care", "consumer care", "marketed by", "manufactured by", "packed by",
-    "serving size", "approx", "coocking", "cooking", "lic no", "lot no", "pkd",
+    "nutrition", "nutritional", "ingredients", "net weight", "net wt", "net quantity", "net qty",
+    "mrp", "batch", "lot no", "b.no", "packed on", "mfg date", "date of mfg", "mfd",
+    "best before", "expiry", "use by", "fssai", "store in", "calories", "keep in",
+    "customer care", "consumer care", "marketed by", "manufactured by", "packed by", "mfg by", "pkd by",
+    "serving size", "approx", "cooking", "lic no", "lot no", "pkd",
     "energy", "protein", "carbohydrate", "fat", "sodium", "fibre", "fiber",
     "per 100", "per serving", "daily value", "allergen", "contains",
+    "unit sale price", "unit price", "usp", "address", "regd office", "factory",
+    "scan qr", "feedback", "helpline", "email", "phone", "toll free",
+    "country of origin", "made in", "product of", "veg", "non-veg", "100% veg",
 }
 
 
@@ -372,11 +444,23 @@ def extract_fields(ocr_result: OCRResult, lang_code: str = "en") -> LabelData:
 # Individual field extractors
 # ─────────────────────────────────────────────────────────────────────────────
 
+def _get_line_prefix(text: str, start_idx: int) -> str:
+    """Get the text on the same line preceding start_idx."""
+    line_start = text.rfind("\n", 0, start_idx)
+    if line_start == -1:
+        line_start = 0
+    else:
+        line_start += 1
+    return text[line_start:start_idx].lower()
+
+
 def _extract_mrp(text: str) -> Optional[float]:
-    # 1. Look for explicit labelled MRP declaration
-    match = _LABELLED_MRP_PATTERN.search(text)
-    if match:
-        raw = match.group(1).replace(",", ".")
+    # 1. Look for explicit labelled MRP declaration (highest priority)
+    for match in _LABELLED_MRP_PATTERN.finditer(text):
+        prefix = _get_line_prefix(text, match.start())
+        if any(usp_kw in prefix for usp_kw in _USP_LINE_INDICATORS):
+            continue
+        raw = match.group(1).replace(" ", "").replace(",", ".")
         try:
             val = float(raw)
             if 1.0 <= val <= 99999.0:   # sanity check
@@ -384,10 +468,25 @@ def _extract_mrp(text: str) -> Optional[float]:
         except ValueError:
             pass
 
-    # 2. Look for standalone currency declaration fallback
-    match2 = _STANDALONE_PRICE_PATTERN.search(text)
-    if match2:
-        raw2 = match2.group(1).replace(",", ".")
+    # 2. Look for generic Price declaration (Total Price, Net Price, Price:)
+    for match in _GENERIC_PRICE_PATTERN.finditer(text):
+        prefix = _get_line_prefix(text, match.start())
+        if any(usp_kw in prefix for usp_kw in _USP_LINE_INDICATORS):
+            continue
+        raw = match.group(1).replace(" ", "").replace(",", ".")
+        try:
+            val = float(raw)
+            if 1.0 <= val <= 99999.0:
+                return val
+        except ValueError:
+            pass
+
+    # 3. Look for standalone currency declaration fallback (e.g. "₹ 150/-")
+    for match2 in _STANDALONE_PRICE_PATTERN.finditer(text):
+        prefix = _get_line_prefix(text, match2.start())
+        if any(usp_kw in prefix for usp_kw in _USP_LINE_INDICATORS):
+            continue
+        raw2 = match2.group(1).replace(" ", "").replace(",", ".")
         try:
             val2 = float(raw2)
             if 1.0 <= val2 <= 99999.0:
@@ -564,6 +663,22 @@ def _extract_manufacturer_info(text: str) -> tuple[Optional[str], Optional[str]]
                 if len(inline_addr) >= 5:
                     mfr_addr = inline_addr
 
+    # Fallback for manufacturer name by company legal entities (Pvt Ltd, Foods Ltd, etc.)
+    if not mfr_name:
+        lines = [l.strip() for l in text.split("\n") if l.strip()]
+        for line in lines:
+            if any(kw in line.lower() for kw in _IGNORED_COMPANY_LINE_KEYWORDS):
+                continue
+            if _COMPANY_CHECK_REGEX.search(line):
+                cand = re.split(
+                    r",\s*(?:Plot|Sector|MIDC|GIDC|Road|Street|Building|Floor|Chambers|Regd|\d{6})",
+                    line,
+                    flags=re.IGNORECASE,
+                )[0].strip().rstrip(",.")
+                if 3 <= len(cand) <= 80:
+                    mfr_name = cand
+                    break
+
     # Fallback for address with PIN code anywhere in text
     if not mfr_addr:
         pin_match = _ADDRESS_PIN_PATTERN.search(text)
@@ -618,20 +733,53 @@ def _extract_manufacturer_address(text: str) -> Optional[str]:
 def _extract_generic_name(text: str, mfr_name: Optional[str]) -> Optional[str]:
     """
     Extract product / commodity name:
-    Looks for the top non-noise line describing the product.
+    1. Looks for explicit statutory declarations (Name of Commodity, Generic Name, Product Name, etc.)
+    2. Fallback: inspects top non-noise title lines and merges connected multi-line titles.
     """
+    # 1. Primary: Explicit statutory commodity declaration
+    for match in _COMMODITY_DECLARATION_PATTERN.finditer(text):
+        cand = match.group(1).strip().rstrip(",.")
+        if 2 <= len(cand) <= 80 and not any(kw in cand.lower() for kw in _IGNORED_PRODUCT_KEYWORDS):
+            return cand
+
+    # 2. Fallback: Look at top non-noise lines
     lines = [l.strip() for l in text.split("\n") if l.strip()]
-    for line in lines:
-        if len(line) < 3 or len(line) > 80:
+    candidate_lines = []
+
+    for i, line in enumerate(lines):
+        line_clean = line.strip()
+        if len(line_clean) < 2 or len(line_clean) > 80:
             continue
-        line_lower = line.lower()
-        if mfr_name and line_lower in mfr_name.lower():
+        line_lower = line_clean.lower()
+        if mfr_name and (line_lower in mfr_name.lower() or mfr_name.lower() in line_lower):
             continue
         if any(kw in line_lower for kw in _IGNORED_PRODUCT_KEYWORDS):
             continue
-        # Must contain at least some alphabetical content
-        if re.match(r"^[A-Za-z0-9\s\-&']+$", line) and re.search(r"[A-Za-z]{2,}", line):
-            return line
+        # Skip lines that are just numbers, dates, or prices
+        if re.match(r"^[\d\s.,/\-:]+$", line_clean):
+            continue
+        # Must contain alphabetical letters
+        if not re.search(r"[A-Za-z]{2,}", line_clean):
+            continue
+
+        candidate_lines.append(line_clean)
+
+        # If this is the first candidate title line, check if the subsequent line is connected (e.g. ROASTED + ALMONDS)
+        if len(candidate_lines) == 1:
+            words = line_clean.split()
+            if len(words) <= 3 and i + 1 < len(lines):
+                next_line = lines[i + 1].strip()
+                next_lower = next_line.lower()
+                if (
+                    2 <= len(next_line) <= 40
+                    and not any(kw in next_lower for kw in _IGNORED_PRODUCT_KEYWORDS)
+                    and not re.match(r"^[\d\s.,/\-:]+$", next_line)
+                    and re.search(r"[A-Za-z]{2,}", next_line)
+                    and not (mfr_name and next_lower in mfr_name.lower())
+                ):
+                    return f"{line_clean} {next_line}"
+            return line_clean
+
     return None
 
 

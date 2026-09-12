@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
 import 'config/app_router.dart';
+import 'config/app_theme.dart';
 import 'services/api_service.dart';
 import 'services/auth_service.dart';
 
@@ -60,14 +61,7 @@ class _LabelSureAppState extends State<LabelSureApp> {
       child: MaterialApp.router(
         title: 'LabelSure',
         debugShowCheckedModeBanner: false,
-        theme: ThemeData(
-          colorScheme: ColorScheme.fromSeed(
-            seedColor: const Color(0xFF3B82F6),
-            brightness: Brightness.dark,
-          ),
-          useMaterial3: true,
-          fontFamily: 'Inter',
-        ),
+        theme: AppTheme.darkTheme,
         routerConfig: _router,
       ),
     );

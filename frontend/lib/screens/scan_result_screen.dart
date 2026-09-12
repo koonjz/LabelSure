@@ -1,11 +1,11 @@
-// LabelSure — Scan Result Screen
-// Shows COMPLIANT/NON_COMPLIANT badge + full rule checklist.
 import 'package:flutter/material.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 import 'package:go_router/go_router.dart';
 import 'package:intl/intl.dart';
+import '../config/app_theme.dart';
 import '../models/scan.dart';
 import '../widgets/compliance_badge.dart';
+import '../widgets/profile_button.dart';
 import '../widgets/rule_checklist.dart';
 
 class ScanResultScreen extends StatelessWidget {
@@ -17,17 +17,17 @@ class ScanResultScreen extends StatelessWidget {
   Widget build(BuildContext context) {
     final verdict = scan.verdict ?? 'NEEDS_REVIEW';
     final Color verdictColor = verdict == 'COMPLIANT'
-        ? const Color(0xFF22C55E)
+        ? AppColors.statusCompliant        // #2E7D32 Safe Green
         : verdict == 'NON_COMPLIANT'
-            ? const Color(0xFFEF4444)
-            : const Color(0xFFF59E0B);
+            ? AppColors.statusNonCompliant // #C62828 Red
+            : AppColors.statusReview;      // #D97706 Amber
 
     return Scaffold(
-      backgroundColor: const Color(0xFF0A0F1C),
+      backgroundColor: AppColors.background,
       body: CustomScrollView(
         slivers: [
           SliverAppBar(
-            backgroundColor: const Color(0xFF0A0F1C),
+            backgroundColor: AppColors.background,
             expandedHeight: 300,
             pinned: true,
             flexibleSpace: FlexibleSpaceBar(
@@ -35,8 +35,8 @@ class ScanResultScreen extends StatelessWidget {
                 decoration: BoxDecoration(
                   gradient: LinearGradient(
                     colors: [
-                      verdictColor.withOpacity(0.15),
-                      const Color(0xFF0A0F1C),
+                      verdictColor.withValues(alpha: 0.18),
+                      AppColors.background,
                     ],
                     begin: Alignment.topCenter,
                     end: Alignment.bottomCenter,
@@ -53,14 +53,18 @@ class ScanResultScreen extends StatelessWidget {
                         margin: const EdgeInsets.symmetric(horizontal: 32),
                         padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
                         decoration: BoxDecoration(
-                          color: const Color(0xFFF59E0B).withOpacity(0.15),
-                          borderRadius: BorderRadius.circular(8),
-                          border: Border.all(color: const Color(0xFFF59E0B).withOpacity(0.3)),
+                          color: AppColors.statusReviewBg,
+                          borderRadius: BorderRadius.circular(10),
+                          border: Border.all(color: AppColors.statusReviewBorder),
                         ),
                         child: const Text(
-                          '⚠ Manual review required',
+                          '⚠ Manual review required by officer',
                           textAlign: TextAlign.center,
-                          style: TextStyle(color: Color(0xFFF59E0B), fontSize: 12),
+                          style: TextStyle(
+                            color: AppColors.statusReviewLight,
+                            fontSize: 12,
+                            fontWeight: FontWeight.w600,
+                          ),
                         ),
                       ),
                   ],
@@ -71,6 +75,12 @@ class ScanResultScreen extends StatelessWidget {
               onPressed: () => context.go('/home'),
               icon: const Icon(Icons.arrow_back_ios_new_rounded, color: Colors.white, size: 20),
             ),
+            actions: const [
+              Padding(
+                padding: EdgeInsets.only(right: 16),
+                child: ProfileButton(),
+              ),
+            ],
           ),
           SliverPadding(
             padding: const EdgeInsets.all(20),
@@ -86,20 +96,20 @@ class ScanResultScreen extends StatelessWidget {
                     padding: const EdgeInsets.all(14),
                     margin: const EdgeInsets.only(bottom: 20),
                     decoration: BoxDecoration(
-                      color: const Color(0xFFF59E0B).withOpacity(0.1),
+                      color: AppColors.statusReviewBg,
                       borderRadius: BorderRadius.circular(12),
-                      border: Border.all(color: const Color(0xFFF59E0B).withOpacity(0.3)),
+                      border: Border.all(color: AppColors.statusReviewBorder),
                     ),
                     child: Row(
                       children: [
                         const Icon(Icons.info_outline_rounded,
-                            color: Color(0xFFF59E0B), size: 18),
+                            color: AppColors.statusReviewLight, size: 18),
                         const SizedBox(width: 10),
                         Expanded(
                           child: Text(
                             scan.reviewReason!,
                             style: const TextStyle(
-                              color: Color(0xFFF59E0B),
+                              color: AppColors.statusReviewLight,
                               fontSize: 12,
                               height: 1.5,
                             ),
@@ -124,9 +134,9 @@ class ScanResultScreen extends StatelessWidget {
                 const SizedBox(height: 20),
 
                 // Extracted fields
-                Text(
+                const Text(
                   'Extracted Fields',
-                  style: const TextStyle(
+                  style: TextStyle(
                     color: Colors.white,
                     fontSize: 16,
                     fontWeight: FontWeight.bold,
@@ -149,10 +159,15 @@ class ScanResultScreen extends StatelessWidget {
                   height: 52,
                   child: DecoratedBox(
                     decoration: BoxDecoration(
-                      gradient: const LinearGradient(
-                        colors: [Color(0xFF3B82F6), Color(0xFF8B5CF6)],
-                      ),
+                      gradient: AppColors.brandGradientHorizontal,
                       borderRadius: BorderRadius.circular(14),
+                      boxShadow: [
+                        BoxShadow(
+                          color: AppColors.brandBlue.withValues(alpha: 0.35),
+                          blurRadius: 12,
+                          offset: const Offset(0, 4),
+                        ),
+                      ],
                     ),
                     child: ElevatedButton.icon(
                       onPressed: () => context.go('/home'),
@@ -195,9 +210,9 @@ class _SummaryCard extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: const Color(0xFF1E293B),
+        color: AppColors.surface,
         borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: Colors.white.withOpacity(0.08)),
+        border: Border.all(color: AppColors.borderSubtle),
       ),
       child: Column(
         children: [
@@ -242,8 +257,8 @@ class _SummaryCard extends StatelessWidget {
             value: '${scan.passCount} / ${scan.ruleResults.length}',
             icon: Icons.check_circle_outline_rounded,
             valueColor: scan.passCount == scan.ruleResults.length
-                ? const Color(0xFF22C55E)
-                : const Color(0xFFEF4444),
+                ? AppColors.statusCompliant
+                : AppColors.statusNonCompliant,
           ),
         ],
       ),
@@ -264,6 +279,7 @@ class _SummaryCard extends StatelessWidget {
       case 'paddleocr': return 'PaddleOCR ✦';
       case 'tesseract': return 'Tesseract';
       case 'paddleocr+tesseract': return 'PaddleOCR + Tesseract';
+      case 'mlkit': return 'Google ML Kit (On-Device)';
       default: return engine;
     }
   }
@@ -286,11 +302,11 @@ class _InfoRow extends StatelessWidget {
   Widget build(BuildContext context) {
     return Row(
       children: [
-        Icon(icon, color: const Color(0xFF60A5FA), size: 18),
+        Icon(icon, color: AppColors.brandTealLight, size: 18),
         const SizedBox(width: 10),
         Text(
           label,
-          style: TextStyle(color: Colors.white.withOpacity(0.5), fontSize: 13),
+          style: const TextStyle(color: AppColors.textSecondary, fontSize: 13),
         ),
         const Spacer(),
         Text(
@@ -318,14 +334,14 @@ class _ExtractedFieldsCard extends StatelessWidget {
       return Container(
         padding: const EdgeInsets.all(16),
         decoration: BoxDecoration(
-          color: const Color(0xFF1E293B),
+          color: AppColors.surface,
           borderRadius: BorderRadius.circular(16),
-          border: Border.all(color: Colors.white.withOpacity(0.08)),
+          border: Border.all(color: AppColors.borderSubtle),
         ),
-        child: Center(
+        child: const Center(
           child: Text(
             'No fields extracted',
-            style: TextStyle(color: Colors.white.withOpacity(0.4)),
+            style: TextStyle(color: AppColors.textMuted),
           ),
         ),
       );
@@ -333,9 +349,9 @@ class _ExtractedFieldsCard extends StatelessWidget {
 
     return Container(
       decoration: BoxDecoration(
-        color: const Color(0xFF1E293B),
+        color: AppColors.surface,
         borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: Colors.white.withOpacity(0.08)),
+        border: Border.all(color: AppColors.borderSubtle),
       ),
       child: ListView.separated(
         shrinkWrap: true,
@@ -354,8 +370,8 @@ class _ExtractedFieldsCard extends StatelessWidget {
                   flex: 2,
                   child: Text(
                     f.displayName,
-                    style: TextStyle(
-                      color: Colors.white.withOpacity(0.5),
+                    style: const TextStyle(
+                      color: AppColors.textSecondary,
                       fontSize: 12,
                     ),
                   ),
@@ -397,9 +413,9 @@ class _RawOcrCardState extends State<_RawOcrCard> {
   Widget build(BuildContext context) {
     return Container(
       decoration: BoxDecoration(
-        color: const Color(0xFF0F1A2E),
+        color: AppColors.surfaceSubtle,
         borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: const Color(0xFF3B82F6).withOpacity(0.25)),
+        border: Border.all(color: AppColors.brandTeal.withValues(alpha: 0.25)),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -412,7 +428,7 @@ class _RawOcrCardState extends State<_RawOcrCard> {
               child: Row(
                 children: [
                   const Icon(Icons.document_scanner_rounded,
-                      color: Color(0xFF60A5FA), size: 18),
+                      color: AppColors.brandTealLight, size: 18),
                   const SizedBox(width: 10),
                   const Expanded(
                     child: Text(
@@ -427,14 +443,14 @@ class _RawOcrCardState extends State<_RawOcrCard> {
                   Text(
                     _expanded ? 'Hide' : 'Show',
                     style: const TextStyle(
-                        color: Color(0xFF60A5FA), fontSize: 12),
+                        color: AppColors.brandTealLight, fontSize: 12),
                   ),
                   const SizedBox(width: 4),
                   Icon(
                     _expanded
                         ? Icons.keyboard_arrow_up_rounded
                         : Icons.keyboard_arrow_down_rounded,
-                    color: const Color(0xFF60A5FA),
+                    color: AppColors.brandTealLight,
                     size: 20,
                   ),
                 ],

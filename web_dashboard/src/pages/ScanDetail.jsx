@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { api } from '../services/api';
+import { exportSingleScanPdf } from '../services/pdfExport';
 
 function RuleItem({ rule }) {
   const [expanded, setExpanded] = useState(!rule.passed);
@@ -80,7 +81,17 @@ export default function ScanDetail({ scanId, onBack }) {
 
   return (
     <div className="page">
-      <button id="back-btn" className="btn btn-outline" style={{ marginBottom: 20 }} onClick={onBack}>← Back to Dashboard</button>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 }}>
+        <button id="back-btn" className="btn btn-outline" onClick={onBack}>← Back to Dashboard</button>
+        <button
+          id="export-scan-pdf-btn"
+          className="btn btn-export"
+          onClick={() => exportSingleScanPdf(scan, user)}
+          title="Export single scan audit certificate as PDF"
+        >
+          📄 Export PDF Report
+        </button>
+      </div>
 
       <div className="detail-panel">
         <div className="detail-header">

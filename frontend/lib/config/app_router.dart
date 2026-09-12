@@ -9,6 +9,8 @@ import '../screens/scan_result_screen.dart';
 import '../screens/scan_screen.dart';
 import '../services/auth_service.dart';
 
+import 'app_theme.dart';
+
 /// Shell that hosts the bottom navigation bar.
 class _HomeShell extends StatefulWidget {
   final Widget child;
@@ -24,32 +26,45 @@ class _HomeShellState extends State<_HomeShell> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: const Color(0xFF0A0F1C),
+      backgroundColor: AppColors.background,
       body: widget.child,
-      bottomNavigationBar: BottomNavigationBar(
-        backgroundColor: const Color(0xFF0F172A),
-        selectedItemColor: const Color(0xFF3B82F6),
-        unselectedItemColor: Colors.white38,
-        currentIndex: _currentIndex,
-        onTap: (index) {
-          setState(() => _currentIndex = index);
-          switch (index) {
-            case 0:
-              context.go('/home');
-            case 1:
-              context.go('/history');
-          }
-        },
-        items: const [
-          BottomNavigationBarItem(
-            icon: Icon(Icons.document_scanner_rounded),
-            label: 'Scan',
+      bottomNavigationBar: Container(
+        decoration: BoxDecoration(
+          color: AppColors.surface,
+          border: Border(
+            top: BorderSide(color: AppColors.borderSubtle, width: 1),
           ),
-          BottomNavigationBarItem(
-            icon: Icon(Icons.history_rounded),
-            label: 'History',
-          ),
-        ],
+        ),
+        child: BottomNavigationBar(
+          backgroundColor: AppColors.surface,
+          elevation: 0,
+          selectedItemColor: AppColors.brandTealLight,
+          unselectedItemColor: AppColors.textMuted,
+          selectedLabelStyle: const TextStyle(fontWeight: FontWeight.bold, fontSize: 12),
+          unselectedLabelStyle: const TextStyle(fontWeight: FontWeight.w500, fontSize: 12),
+          currentIndex: _currentIndex,
+          onTap: (index) {
+            setState(() => _currentIndex = index);
+            switch (index) {
+              case 0:
+                context.go('/home');
+              case 1:
+                context.go('/history');
+            }
+          },
+          items: const [
+            BottomNavigationBarItem(
+              icon: Icon(Icons.document_scanner_rounded),
+              activeIcon: Icon(Icons.document_scanner_rounded, color: AppColors.brandTealLight),
+              label: 'Scan',
+            ),
+            BottomNavigationBarItem(
+              icon: Icon(Icons.history_rounded),
+              activeIcon: Icon(Icons.history_rounded, color: AppColors.brandTealLight),
+              label: 'History',
+            ),
+          ],
+        ),
       ),
     );
   }

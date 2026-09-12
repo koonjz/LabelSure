@@ -1,11 +1,11 @@
-// LabelSure — Scan Detail Screen
-// Shows full details for a single scan fetched from the API.
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
+import '../config/app_theme.dart';
 import '../models/scan.dart';
 import '../services/api_service.dart';
 import '../widgets/compliance_badge.dart';
+import '../widgets/profile_button.dart';
 import '../widgets/rule_checklist.dart';
 
 class ScanDetailScreen extends StatefulWidget {
@@ -51,37 +51,47 @@ class _ScanDetailScreenState extends State<ScanDetailScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: const Color(0xFF0A0F1C),
+      backgroundColor: AppColors.background,
       appBar: AppBar(
-        backgroundColor: const Color(0xFF0A0F1C),
+        backgroundColor: AppColors.background,
         title: const Text(
-          'Scan Detail',
+          'Scan Details',
           style: TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.bold),
         ),
         leading: IconButton(
           icon: const Icon(Icons.arrow_back_ios_new_rounded, color: Colors.white, size: 20),
           onPressed: () => context.pop(),
         ),
+        actions: const [
+          Padding(
+            padding: EdgeInsets.only(right: 16),
+            child: ProfileButton(),
+          ),
+        ],
         elevation: 0,
       ),
       body: _isLoading
-          ? const Center(child: CircularProgressIndicator(color: Color(0xFF3B82F6)))
+          ? const Center(child: CircularProgressIndicator(color: AppColors.brandTealLight))
           : _error != null
               ? Center(
                   child: Column(
                     mainAxisSize: MainAxisSize.min,
                     children: [
-                      const Icon(Icons.error_outline,
-                          color: Color(0xFFEF4444), size: 48),
+                      const Icon(Icons.error_outline_rounded,
+                          color: AppColors.statusNonCompliantLight, size: 48),
                       const SizedBox(height: 12),
                       Text(
                         _error!,
-                        style: const TextStyle(color: Colors.white54),
+                        style: const TextStyle(color: AppColors.textSecondary),
                         textAlign: TextAlign.center,
                       ),
                       const SizedBox(height: 16),
                       ElevatedButton(
                         onPressed: _load,
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: AppColors.brandBlue,
+                          foregroundColor: Colors.white,
+                        ),
                         child: const Text('Retry'),
                       ),
                     ],
@@ -98,21 +108,22 @@ class _ScanDetailScreenState extends State<ScanDetailScreen> {
 
                       // Scan ID
                       Text(
-                        'Scan ID: ${_scan!.id.substring(0, 8).toUpperCase()}',
-                        style: TextStyle(
-                          color: Colors.white.withOpacity(0.5),
+                        'SCAN ID: ${_scan!.id.substring(0, 8).toUpperCase()}',
+                        style: const TextStyle(
+                          color: AppColors.textSecondary,
                           fontSize: 12,
                           letterSpacing: 1,
+                          fontWeight: FontWeight.w600,
                         ),
                       ),
                       const SizedBox(height: 24),
 
                       // Rule checklist
-                      Align(
+                      const Align(
                         alignment: Alignment.centerLeft,
                         child: Text(
                           'Compliance Rules',
-                          style: const TextStyle(
+                          style: TextStyle(
                             color: Colors.white,
                             fontSize: 16,
                             fontWeight: FontWeight.bold,
@@ -125,11 +136,11 @@ class _ScanDetailScreenState extends State<ScanDetailScreen> {
                       const SizedBox(height: 20),
 
                       // Extracted fields
-                      Align(
+                      const Align(
                         alignment: Alignment.centerLeft,
                         child: Text(
                           'Extracted Label Fields',
-                          style: const TextStyle(
+                          style: TextStyle(
                             color: Colors.white,
                             fontSize: 16,
                             fontWeight: FontWeight.bold,
@@ -139,10 +150,9 @@ class _ScanDetailScreenState extends State<ScanDetailScreen> {
                       const SizedBox(height: 12),
                       Container(
                         decoration: BoxDecoration(
-                          color: const Color(0xFF1E293B),
-                          borderRadius: BorderRadius.circular(14),
-                          border:
-                              Border.all(color: Colors.white.withOpacity(0.08)),
+                          color: AppColors.surface,
+                          borderRadius: BorderRadius.circular(16),
+                          border: Border.all(color: AppColors.borderSubtle),
                         ),
                         child: ListView.separated(
                           shrinkWrap: true,
@@ -167,8 +177,8 @@ class _ScanDetailScreenState extends State<ScanDetailScreen> {
                                     flex: 2,
                                     child: Text(
                                       f.displayName,
-                                      style: TextStyle(
-                                        color: Colors.white.withOpacity(0.5),
+                                      style: const TextStyle(
+                                        color: AppColors.textSecondary,
                                         fontSize: 12,
                                       ),
                                     ),

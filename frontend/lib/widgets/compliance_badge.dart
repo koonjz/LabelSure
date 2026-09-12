@@ -1,7 +1,6 @@
-// LabelSure — Compliance Badge Widget
-// Displays a large COMPLIANT / NON_COMPLIANT / NEEDS_REVIEW badge.
 import 'package:flutter/material.dart';
 import 'package:flutter_animate/flutter_animate.dart';
+import '../config/app_theme.dart';
 
 class ComplianceBadge extends StatelessWidget {
   final String verdict; // 'COMPLIANT' | 'NON_COMPLIANT' | 'NEEDS_REVIEW'
@@ -31,7 +30,7 @@ class ComplianceBadge extends StatelessWidget {
         ),
         boxShadow: [
           BoxShadow(
-            color: config.color.withOpacity(0.4),
+            color: config.color.withValues(alpha: 0.4),
             blurRadius: large ? 30 : 12,
             spreadRadius: large ? 6 : 2,
           ),
@@ -67,23 +66,23 @@ class ComplianceBadge extends StatelessWidget {
   _BadgeConfig _badgeConfig(String verdict) {
     switch (verdict) {
       case 'COMPLIANT':
-        return _BadgeConfig(
-          color: const Color(0xFF22C55E),
-          lightColor: const Color(0xFF4ADE80),
+        return const _BadgeConfig(
+          color: AppColors.statusCompliant,          // #2E7D32 Safe Green
+          lightColor: AppColors.statusCompliantLight,
           icon: Icons.verified_rounded,
           label: 'COMPLIANT',
         );
       case 'NON_COMPLIANT':
-        return _BadgeConfig(
-          color: const Color(0xFFEF4444),
-          lightColor: const Color(0xFFF87171),
+        return const _BadgeConfig(
+          color: AppColors.statusNonCompliant,       // #C62828 Red
+          lightColor: AppColors.statusNonCompliantLight,
           icon: Icons.cancel_rounded,
           label: 'NON\nCOMPLIANT',
         );
       default:
-        return _BadgeConfig(
-          color: const Color(0xFFF59E0B),
-          lightColor: const Color(0xFFFBBF24),
+        return const _BadgeConfig(
+          color: AppColors.statusReview,             // #D97706 Amber
+          lightColor: AppColors.statusReviewLight,
           icon: Icons.help_outline_rounded,
           label: 'NEEDS\nREVIEW',
         );
@@ -103,3 +102,4 @@ class _BadgeConfig {
     required this.label,
   });
 }
+

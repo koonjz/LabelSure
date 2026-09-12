@@ -1,8 +1,8 @@
-// LabelSure — Login Screen
 import 'package:flutter/material.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
+import '../config/app_theme.dart';
 import '../services/auth_service.dart';
 
 class LoginScreen extends StatefulWidget {
@@ -53,22 +53,22 @@ class _LoginScreenState extends State<LoginScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: const Color(0xFF0A0F1C),
+      backgroundColor: AppColors.background,
       body: SafeArea(
         child: Stack(
           children: [
-            // Background decorative circles
+            // Background decorative brand orbs
             Positioned(
-              top: -80,
-              right: -80,
+              top: -60,
+              right: -60,
               child: Container(
-                width: 300,
-                height: 300,
+                width: 260,
+                height: 260,
                 decoration: BoxDecoration(
                   shape: BoxShape.circle,
                   gradient: RadialGradient(
                     colors: [
-                      const Color(0xFF3B82F6).withOpacity(0.15),
+                      AppColors.brandBlue.withValues(alpha: 0.18),
                       Colors.transparent,
                     ],
                   ),
@@ -76,16 +76,16 @@ class _LoginScreenState extends State<LoginScreen> {
               ),
             ),
             Positioned(
-              bottom: -100,
-              left: -100,
+              bottom: -80,
+              left: -80,
               child: Container(
-                width: 350,
-                height: 350,
+                width: 300,
+                height: 300,
                 decoration: BoxDecoration(
                   shape: BoxShape.circle,
                   gradient: RadialGradient(
                     colors: [
-                      const Color(0xFF8B5CF6).withOpacity(0.1),
+                      AppColors.brandTeal.withValues(alpha: 0.15),
                       Colors.transparent,
                     ],
                   ),
@@ -94,66 +94,74 @@ class _LoginScreenState extends State<LoginScreen> {
             ),
             // Content
             SingleChildScrollView(
-              padding: const EdgeInsets.symmetric(horizontal: 28),
+              padding: const EdgeInsets.symmetric(horizontal: 24),
               child: Column(
                 children: [
-                  const SizedBox(height: 60),
+                  const SizedBox(height: 48),
                   // Logo / Brand
                   Container(
-                    width: 80,
-                    height: 80,
+                    width: 88,
+                    height: 88,
+                    padding: const EdgeInsets.all(12),
                     decoration: BoxDecoration(
-                      gradient: const LinearGradient(
-                        colors: [Color(0xFF3B82F6), Color(0xFF8B5CF6)],
-                        begin: Alignment.topLeft,
-                        end: Alignment.bottomRight,
-                      ),
+                      gradient: AppColors.brandGradient,
                       borderRadius: BorderRadius.circular(24),
                       boxShadow: [
                         BoxShadow(
-                          color: const Color(0xFF3B82F6).withOpacity(0.4),
+                          color: AppColors.brandBlue.withValues(alpha: 0.35),
                           blurRadius: 20,
                           offset: const Offset(0, 8),
                         ),
                       ],
                     ),
-                    child: const Icon(
-                      Icons.document_scanner_rounded,
-                      color: Colors.white,
-                      size: 40,
+                    child: Image.asset(
+                      'assets/icons/app_icon.png',
+                      fit: BoxFit.contain,
+                      errorBuilder: (_, __, ___) => const Icon(
+                        Icons.document_scanner_rounded,
+                        color: Colors.white,
+                        size: 44,
+                      ),
                     ),
                   )
                       .animate()
                       .scale(duration: 600.ms, curve: Curves.elasticOut)
                       .fade(duration: 400.ms),
-                  const SizedBox(height: 24),
-                  Text(
+                  const SizedBox(height: 20),
+                  const Text(
                     'LabelSure',
-                    style: const TextStyle(
+                    style: TextStyle(
                       color: Colors.white,
-                      fontSize: 32,
+                      fontSize: 30,
                       fontWeight: FontWeight.bold,
                       letterSpacing: -0.5,
                     ),
                   ).animate().fadeIn(delay: 200.ms),
-                  const SizedBox(height: 6),
-                  Text(
+                  const SizedBox(height: 4),
+                  const Text(
                     'Legal Metrology Compliance Scanner',
                     style: TextStyle(
-                      color: Colors.white.withOpacity(0.5),
-                      fontSize: 14,
+                      color: AppColors.textSecondary,
+                      fontSize: 13,
                     ),
                   ).animate().fadeIn(delay: 300.ms),
-                  const SizedBox(height: 48),
+                  const SizedBox(height: 36),
                   // Form card
                   Container(
                     padding: const EdgeInsets.all(24),
                     decoration: BoxDecoration(
-                      color: const Color(0xFF1E293B),
+                      color: AppColors.surface,
                       borderRadius: BorderRadius.circular(20),
                       border: Border.all(
-                        color: Colors.white.withOpacity(0.08),
+                        color: AppColors.borderSubtle,
                       ),
+                      boxShadow: [
+                        BoxShadow(
+                          color: Colors.black.withValues(alpha: 0.25),
+                          blurRadius: 16,
+                          offset: const Offset(0, 4),
+                        ),
+                      ],
                     ),
                     child: Form(
                       key: _formKey,
@@ -164,16 +172,16 @@ class _LoginScreenState extends State<LoginScreen> {
                             _isRegisterMode ? 'Create Account' : 'Sign In',
                             style: const TextStyle(
                               color: Colors.white,
-                              fontSize: 22,
+                              fontSize: 20,
                               fontWeight: FontWeight.bold,
                             ),
                           ),
-                          const SizedBox(height: 20),
+                          const SizedBox(height: 18),
                           if (_isRegisterMode) ...[
                             _InputField(
                               controller: _nameCtrl,
                               label: 'Full Name (optional)',
-                              icon: Icons.person_outline,
+                              icon: Icons.person_outline_rounded,
                             ),
                             const SizedBox(height: 14),
                           ],
@@ -189,12 +197,12 @@ class _LoginScreenState extends State<LoginScreen> {
                           _InputField(
                             controller: _passCtrl,
                             label: 'Password',
-                            icon: Icons.lock_outline,
+                            icon: Icons.lock_outline_rounded,
                             obscureText: _obscurePass,
                             suffixIcon: IconButton(
                               icon: Icon(
-                                _obscurePass ? Icons.visibility_off : Icons.visibility,
-                                color: Colors.white38,
+                                _obscurePass ? Icons.visibility_off_rounded : Icons.visibility_rounded,
+                                color: AppColors.textMuted,
                                 size: 20,
                               ),
                               onPressed: () => setState(() => _obscurePass = !_obscurePass),
@@ -218,7 +226,7 @@ class _LoginScreenState extends State<LoginScreen> {
                                     child: Text(
                                       auth.error!,
                                       style: const TextStyle(
-                                        color: Color(0xFFEF4444),
+                                        color: AppColors.statusNonCompliantLight,
                                         fontSize: 12,
                                       ),
                                     ),
@@ -233,10 +241,15 @@ class _LoginScreenState extends State<LoginScreen> {
                               height: 52,
                               child: DecoratedBox(
                                 decoration: BoxDecoration(
-                                  gradient: const LinearGradient(
-                                    colors: [Color(0xFF3B82F6), Color(0xFF8B5CF6)],
-                                  ),
+                                  gradient: AppColors.brandGradientHorizontal,
                                   borderRadius: BorderRadius.circular(14),
+                                  boxShadow: [
+                                    BoxShadow(
+                                      color: AppColors.brandBlue.withValues(alpha: 0.35),
+                                      blurRadius: 12,
+                                      offset: const Offset(0, 4),
+                                    ),
+                                  ],
                                 ),
                                 child: ElevatedButton(
                                   onPressed: auth.isLoading ? null : _submit,
@@ -259,7 +272,7 @@ class _LoginScreenState extends State<LoginScreen> {
                                       : Text(
                                           _isRegisterMode ? 'Create Account' : 'Sign In',
                                           style: const TextStyle(
-                                            fontSize: 16,
+                                            fontSize: 15,
                                             fontWeight: FontWeight.bold,
                                             color: Colors.white,
                                           ),
@@ -278,8 +291,9 @@ class _LoginScreenState extends State<LoginScreen> {
                                     ? 'Already have an account? Sign In'
                                     : "Don't have an account? Register",
                                 style: const TextStyle(
-                                  color: Color(0xFF60A5FA),
+                                  color: AppColors.brandTealLight,
                                   fontSize: 13,
+                                  fontWeight: FontWeight.w600,
                                 ),
                               ),
                             ),
@@ -328,26 +342,26 @@ class _InputField extends StatelessWidget {
       style: const TextStyle(color: Colors.white),
       decoration: InputDecoration(
         labelText: label,
-        labelStyle: TextStyle(color: Colors.white.withOpacity(0.5), fontSize: 14),
-        prefixIcon: Icon(icon, color: Colors.white38, size: 20),
+        labelStyle: const TextStyle(color: AppColors.textSecondary, fontSize: 13),
+        prefixIcon: Icon(icon, color: AppColors.textMuted, size: 20),
         suffixIcon: suffixIcon,
         filled: true,
-        fillColor: Colors.white.withOpacity(0.05),
+        fillColor: AppColors.surfaceSubtle,
         border: OutlineInputBorder(
           borderRadius: BorderRadius.circular(12),
-          borderSide: BorderSide(color: Colors.white.withOpacity(0.1)),
+          borderSide: BorderSide(color: AppColors.borderSubtle),
         ),
         enabledBorder: OutlineInputBorder(
           borderRadius: BorderRadius.circular(12),
-          borderSide: BorderSide(color: Colors.white.withOpacity(0.1)),
+          borderSide: BorderSide(color: AppColors.borderSubtle),
         ),
         focusedBorder: OutlineInputBorder(
           borderRadius: BorderRadius.circular(12),
-          borderSide: const BorderSide(color: Color(0xFF3B82F6), width: 1.5),
+          borderSide: const BorderSide(color: AppColors.brandTeal, width: 1.5),
         ),
         errorBorder: OutlineInputBorder(
           borderRadius: BorderRadius.circular(12),
-          borderSide: const BorderSide(color: Color(0xFFEF4444)),
+          borderSide: const BorderSide(color: AppColors.statusNonCompliant),
         ),
         contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
       ),
@@ -366,9 +380,9 @@ class _RoleSelector extends StatelessWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text(
-          'Role',
-          style: TextStyle(color: Colors.white.withOpacity(0.5), fontSize: 12),
+        const Text(
+          'Account Role',
+          style: TextStyle(color: AppColors.textSecondary, fontSize: 12, fontWeight: FontWeight.w500),
         ),
         const SizedBox(height: 8),
         Row(
@@ -421,19 +435,19 @@ class _RoleChip extends StatelessWidget {
         padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
         decoration: BoxDecoration(
           color: isSelected
-              ? const Color(0xFF3B82F6).withOpacity(0.2)
-              : Colors.white.withOpacity(0.05),
+              ? AppColors.brandBlue.withValues(alpha: 0.25)
+              : AppColors.surfaceSubtle,
           borderRadius: BorderRadius.circular(8),
           border: Border.all(
             color: isSelected
-                ? const Color(0xFF3B82F6)
-                : Colors.white.withOpacity(0.1),
+                ? AppColors.brandBlueLight
+                : AppColors.borderSubtle,
           ),
         ),
         child: Text(
           label,
           style: TextStyle(
-            color: isSelected ? const Color(0xFF3B82F6) : Colors.white54,
+            color: isSelected ? Colors.white : AppColors.textSecondary,
             fontSize: 12,
             fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
           ),

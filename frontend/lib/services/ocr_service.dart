@@ -46,22 +46,39 @@ class OnDeviceOcrService {
 
   // ── Script detection helpers ───────────────────────────────────────────────
 
-  /// Detect which script the text contains.
+  /// Detect which script the text predominantly contains.
   static String _detectScript(String text) {
-    // Devanagari Unicode range: U+0900–U+097F
-    if (RegExp(r'[\u0900-\u097F]').hasMatch(text)) return 'devanagari';
-    // Tamil: U+0B80–U+0BFF
-    if (RegExp(r'[\u0B80-\u0BFF]').hasMatch(text)) return 'tamil';
-    // Telugu: U+0C00–U+0C7F
-    if (RegExp(r'[\u0C00-\u0C7F]').hasMatch(text)) return 'telugu';
-    // Kannada: U+0C80–U+0CFF
-    if (RegExp(r'[\u0C80-\u0CFF]').hasMatch(text)) return 'kannada';
-    // Malayalam: U+0D00–U+0D7F
-    if (RegExp(r'[\u0D00-\u0D7F]').hasMatch(text)) return 'malayalam';
-    // Gujarati: U+0A80–U+0AFF
-    if (RegExp(r'[\u0A80-\u0AFF]').hasMatch(text)) return 'gujarati';
-    // Gurmukhi (Punjabi): U+0A00–U+0A7F
-    if (RegExp(r'[\u0A00-\u0A7F]').hasMatch(text)) return 'gurmukhi';
+    if (text.trim().isEmpty) return 'latin';
+
+    final latinCount = RegExp(r'[a-zA-Z]').allMatches(text).length;
+
+    final indicCounts = <String, int>{
+      'devanagari': RegExp(r'[\u0900-\u097F]').allMatches(text).length,
+      'tamil': RegExp(r'[\u0B80-\u0BFF]').allMatches(text).length,
+      'telugu': RegExp(r'[\u0C00-\u0C7F]').allMatches(text).length,
+      'kannada': RegExp(r'[\u0C80-\u0CFF]').allMatches(text).length,
+      'malayalam': RegExp(r'[\u0D00-\u0D7F]').allMatches(text).length,
+      'gujarati': RegExp(r'[\u0A80-\u0AFF]').allMatches(text).length,
+      'gurmukhi': RegExp(r'[\u0A00-\u0A7F]').allMatches(text).length,
+      'bengali': RegExp(r'[\u0980-\u09FF]').allMatches(text).length,
+    };
+
+    String? topScript;
+    int maxIndic = 0;
+    for (final entry in indicCounts.entries) {
+      if (entry.value > maxIndic) {
+        maxIndic = entry.value;
+        topScript = entry.key;
+      }
+    }
+
+    // An Indic script is considered dominant only if:
+    // 1. There are at least 15 Indic characters, AND
+    // 2. Either Indic characters outnumber Latin, or Indic forms >= 40% of Latin count
+    if (topScript != null && maxIndic >= 15 && (maxIndic > latinCount || (maxIndic >= 20 && maxIndic > latinCount * 0.4))) {
+      return topScript;
+    }
+
     return 'latin';
   }
 
@@ -70,8 +87,8 @@ class OnDeviceOcrService {
   /// Extract text from [imageFile] using on-device ML Kit OCR.
   ///
   /// Runs a **Latin** pass first (catches English + numbers + MRP/weight).
-  /// If Indic Unicode is detected, runs an additional pass with the
-  /// appropriate Indic script recognizer and merges the results.
+  /// If Indic Unicode is detected or needed, runs an Indic script recognizer
+  /// and only merges it if genuine Indic text was detected.
   ///
   /// Returns an [OcrResult] with the full merged text.
   static Future<OcrResult> extractText(File imageFile) async {
@@ -112,10 +129,15 @@ class OnDeviceOcrService {
           final recognizer = TextRecognizer(script: script);
           try {
             final result = await recognizer.processImage(inputImage);
-            if (result.text.trim().length > indicText.trim().length) {
-              indicText = result.text;
+            final rawText = result.text.trim();
+            final indicGlyphCount = RegExp(r'[\u0900-\u097F]').allMatches(rawText).length;
+
+            // Only accept Indic pass if it actually found meaningful Indic glyphs (>= 12)
+            // to avoid hallucinated noise on English labels
+            if (indicGlyphCount >= 12 && rawText.length > indicText.trim().length) {
+              indicText = rawText;
               indicBlocks = result.blocks.length;
-              debugPrint('[OCR] ${script.name} pass: ${indicText.length} chars');
+              debugPrint('[OCR] ${script.name} pass accepted: ${indicText.length} chars ($indicGlyphCount glyphs)');
             }
           } finally {
             await recognizer.close();

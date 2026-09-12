@@ -286,8 +286,12 @@ async def analyze_text_scan(
         engine_used="mlkit",
     )
 
+    # Language detection & sanitization
+    detected_lang = detect_language(body.ocr_text)
+    effective_lang = detected_lang if (detected_lang == "en" and body.lang_code != "en") else (body.lang_code or detected_lang)
+
     # Field extraction
-    label_data = extract_fields(ocr_result, lang_code=body.lang_code)
+    label_data = extract_fields(ocr_result, lang_code=effective_lang)
     if body.sale_price is not None:
         label_data.entered_sale_price = body.sale_price
     if body.font_type:
@@ -312,7 +316,7 @@ async def analyze_text_scan(
             overall_confidence=ocr_result.min_confidence,
             needs_manual_review=verdict.needs_manual_review,
             review_reason=verdict.review_reason,
-            detected_language=body.lang_code,
+            detected_language=effective_lang,
             created_at=now_dt,
             processed_at=now_dt,
             entered_sale_price=body.sale_price,
@@ -379,7 +383,7 @@ async def analyze_text_scan(
             overall_confidence=ocr_result.min_confidence,
             needs_manual_review=verdict.needs_manual_review,
             review_reason=verdict.review_reason,
-            detected_language=body.lang_code,
+            detected_language=effective_lang,
             raw_ocr_text=body.ocr_text[:4000],
             ocr_engine="mlkit",
             extracted_fields=[

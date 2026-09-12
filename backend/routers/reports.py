@@ -14,9 +14,71 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from backend.auth import get_current_officer
 from backend.database import get_db
-from backend.models import Scan, User
+from backend.models import RuleViolation, Scan, User
 
 router = APIRouter(prefix="/reports", tags=["Reports"])
+
+
+@router.get("/analytics")
+async def get_analytics(
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_officer),
+):
+    """
+    Officer-only: get aggregated Legal Metrology compliance metrics & rule violation distribution.
+    """
+    # 1. Total counts
+    scans_result = await db.execute(select(Scan))
+    scans = scans_result.scalars().all()
+    total_scans = len(scans)
+    compliant_count = sum(1 for s in scans if s.verdict == "COMPLIANT")
+    non_compliant_count = sum(1 for s in scans if s.verdict == "NON_COMPLIANT")
+    needs_review_count = sum(1 for s in scans if s.verdict == "NEEDS_REVIEW" or s.needs_manual_review)
+    compliance_rate = round((compliant_count / total_scans) * 100, 1) if total_scans > 0 else 100.0
+
+    # 2. Rule violations breakdown
+    violations_query = select(RuleViolation).where(
+        RuleViolation.passed == False,
+        RuleViolation.severity != "info",
+    )
+    violations_result = await db.execute(violations_query)
+    violations = violations_result.scalars().all()
+
+    rule_counts = {
+        "Rule 6(1)(a) Name & Address": 0,
+        "Rule 6(1) Generic Name": 0,
+        "Rule 6(1) Net Quantity & Font Height": 0,
+        "Rule 6(1) MRP Inclusive of Taxes": 0,
+        "Rule 6(1) Month & Year of Mfg/Pkg": 0,
+        "Rule 18(2) Dual Pricing Check": 0,
+    }
+
+    for v in violations:
+        rule_id = (v.rule_id or "").upper()
+        rule_name = (v.rule_name or "").lower()
+
+        if "6_1_A" in rule_id or "address" in rule_name or "manufacturer" in rule_name or "packer" in rule_name:
+            rule_counts["Rule 6(1)(a) Name & Address"] += 1
+        elif "6_1_B" in rule_id or "6_1_GENERIC" in rule_id or "generic" in rule_name or "commodity" in rule_name:
+            rule_counts["Rule 6(1) Generic Name"] += 1
+        elif "6_1_C" in rule_id or "6_1_NET" in rule_id or "font" in rule_name or "net quantity" in rule_name or "7" in rule_id:
+            rule_counts["Rule 6(1) Net Quantity & Font Height"] += 1
+        elif "6_1_D" in rule_id or "6_1_MRP" in rule_id or "mrp" in rule_name or "tax" in rule_name:
+            rule_counts["Rule 6(1) MRP Inclusive of Taxes"] += 1
+        elif "6_1_E" in rule_id or "6_1_DATE" in rule_id or "mfg" in rule_name or "month" in rule_name or "year" in rule_name or "pack" in rule_name:
+            rule_counts["Rule 6(1) Month & Year of Mfg/Pkg"] += 1
+        elif "18_2" in rule_id or "18(2)" in rule_id or "dual" in rule_name or "sale price" in rule_name:
+            rule_counts["Rule 18(2) Dual Pricing Check"] += 1
+
+    return {
+        "total_scans": total_scans,
+        "compliant_count": compliant_count,
+        "non_compliant_count": non_compliant_count,
+        "needs_review_count": needs_review_count,
+        "compliance_rate": compliance_rate,
+        "rule_counts": rule_counts,
+    }
+
 
 
 @router.get("/export")

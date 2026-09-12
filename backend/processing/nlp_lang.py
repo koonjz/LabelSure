@@ -45,17 +45,31 @@ def _count_chars_in_range(text: str, lo: int, hi: int) -> int:
     return sum(1 for c in text if lo <= ord(c) <= hi)
 
 
-def detect_script_from_unicode(text: str) -> Optional[str]:
-    """
-    Detect Indic script by counting characters in Unicode ranges.
-    Returns ISO-639-1 code of the dominant script, or None if not Indic.
-    """
+def count_indic_and_latin(text: str) -> tuple[dict[str, int], int]:
     counts = {
         lang: _count_chars_in_range(text, lo, hi)
         for lang, (lo, hi) in INDIC_SCRIPT_RANGES.items()
     }
+    latin_count = len(re.findall(r"[a-zA-Z]", text))
+    return counts, latin_count
+
+
+def detect_script_from_unicode(text: str) -> Optional[str]:
+    """
+    Detect Indic script by counting characters in Unicode ranges.
+    Returns ISO-639-1 code of the dominant script, or None if not Indic.
+    Requires a meaningful presence of Indic glyphs that isn't overwhelmed by Latin text.
+    """
+    counts, latin_count = count_indic_and_latin(text)
+    if not counts:
+        return None
     best_lang = max(counts, key=lambda k: counts[k])
-    if counts[best_lang] > 3:  # at least 4 Indic chars → confident detection
+    best_count = counts[best_lang]
+
+    # Must have at least 15 Indic characters AND either:
+    # 1. More Indic characters than Latin characters, or
+    # 2. Indic characters make up a substantial portion (> 40% of Latin count) with >= 20 chars
+    if best_count >= 15 and (best_count > latin_count or (best_count >= 20 and best_count > 0.4 * latin_count)):
         return best_lang
     return None
 
@@ -65,9 +79,9 @@ def detect_language(text: str) -> str:
     Detect the primary language of the given text.
 
     Strategy:
-      1. Check Unicode ranges for Indic scripts (most reliable for short texts).
-      2. If Indic characters are found, return the specific Indic code (e.g. 'hi', 'ta').
-      3. For all other scripts/Latin characters, default to 'en' for Legal Metrology.
+      1. Check Unicode ranges for Indic scripts (requires substantial Indic character count).
+      2. If Indic characters dominate, return the specific Indic code (e.g. 'hi', 'ta').
+      3. For all other scripts/Latin characters (or when Latin dominates), default to 'en' for Legal Metrology.
 
     Returns:
         ISO-639-1 language code (e.g. 'en', 'hi', 'ta', 'te', 'kn', 'bn').
