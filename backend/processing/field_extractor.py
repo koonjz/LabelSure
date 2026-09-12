@@ -72,19 +72,22 @@ _STANDALONE_NET_QTY_PATTERN = re.compile(
 
 # Manufacture/Packing date patterns:
 #   "Packed On : 09/05/2025", "Mfg. Date: 06/2023", "Date of Mfg: Jun 2023", "MFD: 2023-06"
-#   "PKD./ USE BY DATE: 30.07.22/29.01.23", "Packed On: 01/22", "PKD: 07/2022"
+#   "PKD./ USE BY DATE: 30.07.22/29.01.23", "Packed On: 01/22", "PKD: 07/2022", "Pkg Dt: 05/24"
+#   "Packaging Date", "Date of Packing", "Imported On", "Date of Import"
 _MFG_DATE_PATTERN = re.compile(
     r"(?:"
-    r"Mfg\.?\s*(?:Date|Dt)?\.?"
-    r"|Date\s+of\s+(?:Mfg|Manufacture|Mfgr|Manuf)\.?"
+    r"Mfg\.?\s*(?:Date|Dt|On)?\.?"
+    r"|Date\s+of\s+(?:Mfg|Manufacture|Mfgr|Manuf|Packaging|Packing|Import)\.?"
     r"|MFD\.?"
-    r"|Packed?\s*(?:On|Date|Dt\.?)?\.?"
-    r"|PKD\.?(?:/[^:\n]*)?"        # PKD./ or PKD / USE BY DATE etc.
+    r"|Packed?\s*(?:On|Date|Dt\.?|At)?\.?"
+    r"|Pack(?:ing|age|aging)?\s*(?:Date|Dt|On)?\.?"
+    r"|Pkg\.?\s*(?:Date|Dt|On)?\.?"
+    r"|PKD\.?(?:/[^:\n]*)?"
     r"|Mfg\.?/Pkg\.?"
-    r"|Manufacturing\s+Date"
-    r"|Packing\s+Date"
-    r"|Manuf(?:actured)?\s+(?:On|Date)"
-    r")[:\s]*"
+    r"|Manufacturing\s+(?:Date|Dt|On)?"
+    r"|Manuf(?:actured)?\s+(?:On|Date|Dt)?"
+    r"|Imported?\s+(?:On|Date|Dt)?"
+    r")[:\s\-._]*"
     r"(?:"
     r"(\d{1,2})[/\-.](\d{1,2})[/\.\-](\d{4})"   # group 1,2,3: DD/MM/YYYY
     r"|(\d{1,2})[/\-.](\d{4})"                   # group 4,5: MM/YYYY
@@ -143,15 +146,17 @@ _ADDRESS_KEYWORD_PATTERN = re.compile(
 )
 
 # Batch / Lot No.
-# Note: bare "Batch" must be followed by a qualifier (No./Number/Code/#).
-# "LOT" alone is fine (less ambiguous). "B. No." is also fine.
+# Supports "Batch : 20250509", "Batch No.: ABC", "LOT: 123", "B.No.: 456"
 _BATCH_PATTERN = re.compile(
-    r"(?:Batch\s+(?:No\.?|Number|Code|#)"   # bare "Batch" MUST have qualifier
-    r"|LOT\s*(?:No\.?|Number)?"             # LOT alone OK
-    r"|B\.?\s*No\.?)[:\s\-._]*"             # B. No.
+    r"(?:Batch\s+(?:No\.?|Number|Code|#)"
+    r"|Batch\s*[:\-._]"
+    r"|LOT\s*(?:No\.?|Number)?\b"
+    r"|B\.?\s*No\.?)[:\s\-._]*"
     r"([A-Za-z0-9][A-Za-z0-9/\-_]{2,39})",
     re.IGNORECASE,
 )
+
+
 
 # Best Before / Expiry — several label variants
 _EXPIRY_PATTERN = re.compile(
