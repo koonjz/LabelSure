@@ -137,8 +137,11 @@ async def lifespan(app: FastAPI):
         except Exception as exc:
             logger.warning("OCR warm-up failed (non-fatal): %s", exc)
 
-    loop = asyncio.get_event_loop()
-    await loop.run_in_executor(None, _warmup_ocr)
+    try:
+        loop = asyncio.get_running_loop()   # Python 3.10+ safe inside async context
+        await loop.run_in_executor(None, _warmup_ocr)
+    except Exception as exc:
+        logger.warning("Could not schedule OCR warm-up: %s", exc)
     # ──────────────────────────────────────────────────────────────
 
     yield
