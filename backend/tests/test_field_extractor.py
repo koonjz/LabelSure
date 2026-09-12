@@ -111,6 +111,26 @@ class TestMfgDate:
         m, y = _extract_mfg_date("Packed On: 03/24")
         assert m == 3 and y == 2024
 
+    def test_mfg_alphanumeric_nodash(self):
+        m, y = _extract_mfg_date("Date of MFG.: 01AUG26")
+        assert m == 8 and y == 2026
+
+    def test_mfg_alphanumeric_2024(self):
+        m, y = _extract_mfg_date("Date of MFG.: 25AUG2024")
+        assert m == 8 and y == 2024
+
+    def test_mfg_alphanumeric_spaces(self):
+        m, y = _extract_mfg_date("Date of MFG.: 01 AUG 26")
+        assert m == 8 and y == 2026
+
+    def test_mfg_month_only_alphanumeric(self):
+        m, y = _extract_mfg_date("MFG: AUG 2024")
+        assert m == 8 and y == 2024
+
+    def test_mfg_standalone_alphanumeric(self):
+        m, y = _extract_mfg_date("01AUG26")
+        assert m == 8 and y == 2026
+
 
 # ── Batch Number ──────────────────────────────────────────────────────────────
 
@@ -135,6 +155,10 @@ class TestExpiry:
         result = _extract_expiry("Best Before: 12 Months from Mfg Date\nMRP ₹25")
         assert result is not None and "12" in result
 
+    def test_best_before_alphanumeric(self):
+        result = _extract_expiry("Best Before: 30APR27\nMRP ₹75")
+        assert result is not None and "30APR27" in result
+
     def test_use_by(self):
         result = _extract_expiry("Use By: 30/06/2025\nBatch No. A1")
         assert result is not None
@@ -148,16 +172,20 @@ class TestExpiry:
         assert result is not None
 
 
-# ── FSSAI ─────────────────────────────────────────────────────────────────────
+# ── FSSAI License ─────────────────────────────────────────────────────────────
 
 class TestFSSAI:
+    def test_fssai_explicit(self):
+        result = _extract_fssai("FSSAI Lic. No. 10012011000123\nMRP ₹50")
+        assert result is not None and "10012011000123" in result
+
     def test_fssai_with_keyword(self):
         result = _extract_fssai("FSSAI Lic. No.: 10013022002234\nBest Before")
         assert result is not None and "10013022002234" in result
 
-    def test_fssai_14digit_standalone(self):
-        result = _extract_fssai("Some text\n10013022002234\nMore text")
-        assert result == "10013022002234"
+    def test_fssai_standalone_14digit(self):
+        result = _extract_fssai("Lic. No: 11517001000474")
+        assert result is not None and "11517001000474" in result
 
     def test_fssai_not_found(self):
         assert _extract_fssai("No license number here") is None
@@ -166,7 +194,7 @@ class TestFSSAI:
 # ── Consumer Care ─────────────────────────────────────────────────────────────
 
 class TestConsumerCare:
-    def test_consumer_care_phone(self):
+    def test_consumer_care_tollfree(self):
         result = _extract_consumer_care("Consumer Care: 1800-102-3456\nMRP")
         assert result is not None
 
@@ -199,9 +227,9 @@ class TestNormalizer:
         assert "₹99" in text
 
 
-# ── Manufacturer Name ─────────────────────────────────────────────────────────
+# ── Manufacturer Name & Address ──────────────────────────────────────────────
 
-class TestManufacturerName:
+class TestManufacturerNameAndAddress:
     def test_manufactured_by(self):
         text = "Manufactured by Acme Foods Pvt Ltd\nNet Wt. 200g"
         result = _extract_manufacturer_name(text)

@@ -70,9 +70,31 @@ _STANDALONE_NET_QTY_PATTERN = re.compile(
     re.IGNORECASE,
 )
 
+# Month name → number mapping (including full names and common OCR typos)
+_MONTH_NAMES = {
+    "jan": 1, "january": 1,
+    "feb": 2, "february": 2,
+    "mar": 3, "march": 3,
+    "apr": 4, "april": 4,
+    "may": 5,
+    "jun": 6, "june": 6,
+    "jul": 7, "july": 7,
+    "aug": 8, "august": 8, "ajg": 8, "au6": 8,
+    "sep": 9, "sept": 9, "september": 9,
+    "oct": 10, "october": 10, "0ct": 10,
+    "nov": 11, "november": 11,
+    "dec": 12, "december": 12,
+}
+
+_MONTH_REGEX_STR = (
+    r"(?:Jan(?:uary)?|Feb(?:ruary)?|Mar(?:ch)?|Apr(?:il)?|May|Jun(?:e)?|"
+    r"Jul(?:y)?|Aug(?:ust)?|Ajg|Au6|Sep(?:t(?:ember)?)?|Oct(?:ober)?|0ct|Nov(?:ember)?|Dec(?:ember)?)"
+)
+
 # Manufacture/Packing date patterns:
 #   "Packed On : 09/05/2025", "Mfg. Date: 06/2023", "Date of Mfg: Jun 2023", "MFD: 2023-06"
 #   "PKD./ USE BY DATE: 30.07.22/29.01.23", "Packed On: 01/22", "PKD: 07/2022", "Pkg Dt: 05/24"
+#   "Date of MFG.: 01AUG26", "25AUG2024", "01-AUG-26", "01/AUG/26", "01 AUG 2026", "AUG 2026"
 #   "Packaging Date", "Date of Packing", "Imported On", "Date of Import"
 _MFG_DATE_PATTERN = re.compile(
     r"(?:"
@@ -89,12 +111,20 @@ _MFG_DATE_PATTERN = re.compile(
     r"|Imported?\s+(?:On|Date|Dt)?"
     r")[:\s\-._]*"
     r"(?:"
-    r"(\d{1,2})[/\-.](\d{1,2})[/\.\-](\d{4})"   # group 1,2,3: DD/MM/YYYY
-    r"|(\d{1,2})[/\-.](\d{4})"                   # group 4,5: MM/YYYY
-    r"|(\d{4})[/\-.](\d{1,2})"                   # group 6,7: YYYY/MM
-    r"|([A-Za-z]{3,9})[\s,]+(\d{4})"             # group 8,9: Mon YYYY
-    r"|(\d{1,2})[/\-.](\d{1,2})[/\.\-](\d{2})"  # group 10,11,12: DD/MM/YY
-    r"|(\d{1,2})[/\-.](\d{2})"                   # group 13,14: MM/YY
+    # DD-Mon-YYYY / DDMonYY / DD/Mon/YYYY (e.g. 01AUG26, 25AUG2024, 01-AUG-26, 01 AUG 2026)
+    r"(\d{1,2})[\s/\-.]*(" + _MONTH_REGEX_STR + r")[\s/\-.]*(\d{2,4})"
+    # Mon-YYYY / Mon-YY (e.g. AUG 2026, AUG-26, AUG26, AUG/26)
+    r"|(" + _MONTH_REGEX_STR + r")[\s/\-.,]+(\d{2,4})"
+    # DD/MM/YYYY or DD.MM.YYYY
+    r"|(\d{1,2})[/\-.](\d{1,2})[/\.\-](\d{4})"
+    # MM/YYYY
+    r"|(\d{1,2})[/\-.](\d{4})"
+    # YYYY/MM
+    r"|(\d{4})[/\-.](\d{1,2})"
+    # DD/MM/YY or DD.MM.YY
+    r"|(\d{1,2})[/\-.](\d{1,2})[/\.\-](\d{2})"
+    # MM/YY
+    r"|(\d{1,2})[/\-.](\d{2})"
     r")",
     re.IGNORECASE,
 )
@@ -104,37 +134,40 @@ _DATE_PAIR_PATTERN = re.compile(
     r"(\d{1,2})[./\-](\d{1,2})[./\-](\d{2,4})\s*/\s*(\d{1,2})[./\-](\d{1,2})[./\-](\d{2,4})"
 )
 
+# Standalone Alpha-Numeric date fallback (e.g. 01AUG26, 25AUG2024, AUG 2026)
+_STANDALONE_ALPHA_DATE_PATTERN = re.compile(
+    r"\b(\d{1,2})[\s/\-.]*(" + _MONTH_REGEX_STR + r")[\s/\-.]*(\d{2,4})\b"
+    r"|\b(" + _MONTH_REGEX_STR + r")[\s/\-.,]+(\d{2,4})\b",
+    re.IGNORECASE,
+)
+
 # Standalone date fallback (DD/MM/YYYY or DD.MM.YY or MM/YYYY)
 _STANDALONE_DATE_PATTERN = re.compile(
     r"\b(\d{1,2})[./\-](\d{1,2})[./\-](\d{2,4})\b"
 )
 
-# Month name → number
-_MONTH_NAMES = {
-    "jan": 1, "feb": 2, "mar": 3, "apr": 4, "may": 5, "jun": 6,
-    "jul": 7, "aug": 8, "sep": 9, "oct": 10, "nov": 11, "dec": 12,
-}
-
-# Manufacturer/Packer/Importer name
-_MFR_NAME_PATTERN = re.compile(
-    r"(?:Manufactured\s+(?:and\s+Marketed\s+)?by"
-    r"|Mfg\.?\s*(?:&|and)?\s*(?:Pkd\.?)?\s*by"
-    r"|Packed\s+(?:and\s+Marketed\s+)?by"
+# Manufacturer/Packer/Marketed By prefix pattern
+_MFR_PREFIX_PATTERN = re.compile(
+    r"(?:"
+    r"Manufactured\s+(?:(?:&|and)\s+)?(?:Marketed|Packed)\s+by"
+    r"|Manufactured\s+by"
+    r"|Mfg\.?\s*(?:&|and)?\s*(?:Pkd\.?|Mkt\.?)?\s*by"
+    r"|Packed\s+(?:(?:&|and)\s+)?(?:Marketed|Mfg\.?)\s*by"
+    r"|Packed\s+by"
     r"|Pkd\.?\s+by"
-    r"|Marketed\s+by"
+    r"|Marketed\s+(?:(?:&|and)\s+Distributed\s+)?by"
     r"|Mkt\.?\s+by"
     r"|Imported\s+by"
     r"|Manufacturer"
     r"|Producer"
-    r"|Packer)[:\s]*"
-    r"([A-Za-z0-9\s&,.\-'()/]{3,100}?)"
-    r"(?=\n\s*(?:MRP|Net|Batch|LOT|PKD|Packed|Best|Exp|Lic|FSSAI|Weight|Store|Customer|Consumer|Address|Email|Plot|Ph|Tel|www)|$|\n\n)",
+    r"|Packer"
+    r")[:\s\-._]*",
     re.IGNORECASE,
 )
 
 # Address pattern: PIN code anchor OR address keywords
 _ADDRESS_PIN_PATTERN = re.compile(
-    r"([A-Za-z0-9\s,.\-/]{10,200})\s*[-,]?\s*(?:Pin|PIN|Pin\s*Code)?\s*[-:\s]?\s*(\d{6})\b",
+    r"([A-Za-z0-9\s,.\-/]{10,200})\s*[-,]?\s*(?:Pin|PIN|Pin\s*Code)?\s*[-:\s]?\s*(\d{3}\s*\d{3})\b",
     re.IGNORECASE,
 )
 
@@ -142,6 +175,22 @@ _ADDRESS_KEYWORD_PATTERN = re.compile(
     r"(?:Address|Regd\.?\s*Office|Factory|Unit|Works|Plot|Mfg\.?\s*at|Packed\s*at)[:\s\-._]*"
     r"([A-Za-z0-9\s,.\-/]{8,200}?)"
     r"(?=\n\s*(?:MRP|Net|Batch|LOT|PKD|Packed|Best|Exp|Lic|FSSAI|Weight|Store|Customer|Consumer)|$|\n\n)",
+    re.IGNORECASE,
+)
+
+_INDIAN_LOCATIONS = (
+    r"(?:Maharashtra|Mumbai|Pune|Nagpur|Thane|Nashik|Gujarat|Ahmedabad|Surat|Vadodara|Rajkot|"
+    r"Delhi|New\s+Delhi|Noida|Gurgaon|Gurugram|Faridabad|Ghaziabad|Haryana|Punjab|Chandigarh|Ludhiana|"
+    r"Karnataka|Bangalore|Bengaluru|Mysore|Tamil\s+Nadu|Chennai|Coimbatore|Madurai|"
+    r"Telangana|Hyderabad|Secunderabad|Andhra\s+Pradesh|Visakhapatnam|Vijayawada|"
+    r"West\s+Bengal|Kolkata|Howrah|Rajasthan|Jaipur|Jodhpur|Udaipur|Uttar\s+Pradesh|Lucknow|Kanpur|"
+    r"Kerala|Kochi|Ernakulam|Trivandrum|Thiruvananthapuram|Madhya\s+Pradesh|Indore|Bhopal|"
+    r"Goa|Panaji|Bihar|Patna|Jharkhand|Ranchi|Jamshedpur|Odisha|Bhubaneswar|Assam|Guwahati|"
+    r"Nariman\s+Point|Andheri|Bandra|MIDC|GIDC|RIICO|Industrial\s+Area|Estate|Sector|Phase|Plot|Chambers|Building|Tower|Marg|Road|Street|Nagar)"
+)
+
+_ADDRESS_LOCATION_PATTERN = re.compile(
+    r"([A-Za-z0-9\s,.\-/#()]{5,150}?\b" + _INDIAN_LOCATIONS + r"\b[A-Za-z0-9\s,.\-/#()]{0,100}?(?:\d{3}\s*\d{3})?)",
     re.IGNORECASE,
 )
 
@@ -175,7 +224,7 @@ _EXPIRY_PATTERN = re.compile(
 
 # FSSAI License Number — 14-digit number OR licence text
 _FSSAI_PATTERN = re.compile(
-    r"(?:fssai|FSSAI)[\s\w.]*(?:Lic(?:ense|ence)?\.?\s*(?:No\.?)?|No\.?)?[:\s\-._]*"
+    r"(?:fssai|FSSAI)[\sA-Za-z.]*(?:Lic(?:ense|ence)?\.?\s*(?:No\.?)?|No\.?)?[:\s\-._]*"
     r"(\d{14}|\d[\d\s\-]{12,18}\d|[A-Za-z0-9\s]{3,30}?)"
     r"(?=\n\s*(?:MRP|Net|Batch|LOT|PKD|Packed|Best|Store|Customer|Mfg)|$|\n\n)",
     re.IGNORECASE,
@@ -285,8 +334,7 @@ def extract_fields(ocr_result: OCRResult, lang_code: str = "en") -> LabelData:
     mrp = _extract_mrp(text)
     net_qty_value, net_qty_unit = _extract_net_qty(text)
     mfg_month, mfg_year = _extract_mfg_date(text)
-    mfr_name = _extract_manufacturer_name(text)
-    mfr_addr = _extract_manufacturer_address(text)
+    mfr_name, mfr_addr = _extract_manufacturer_info(text)
     generic_name = _extract_generic_name(text, mfr_name)
     batch_no = _extract_batch_number(text)
     expiry = _extract_expiry(text)
@@ -381,41 +429,51 @@ def _extract_mfg_date(text: str) -> tuple[Optional[int], Optional[int]]:
     # 1. Primary: Keyword-anchored Mfg/PKD date
     match = _MFG_DATE_PATTERN.search(text)
     if match:
-        g = match.groups()  # 14 groups total (indices 0-13)
+        g = match.groups()
         try:
+            # Group 0,1,2: DD-Mon-YYYY or DDMonYY (e.g. 01AUG26, 25AUG2024, 01-AUG-26, 01 AUG 2026)
             if g[0] and g[1] and g[2]:
-                # DD/MM/YYYY or MM/DD/YYYY (e.g. 09/05/2025)
-                first = int(g[0])
-                second = int(g[1])
-                year = int(g[2])
+                m_str = g[1].lower()
+                month = _MONTH_NAMES.get(m_str)
+                y = int(g[2])
+                year = 2000 + y if y < 100 else y
+                return month, year
+            # Group 3,4: Mon-YYYY or Mon-YY (e.g. AUG 2026, AUG-26, AUG26)
+            elif g[3] and g[4]:
+                m_str = g[3].lower()
+                month = _MONTH_NAMES.get(m_str)
+                y = int(g[4])
+                year = 2000 + y if y < 100 else y
+                return month, year
+            # Group 5,6,7: DD/MM/YYYY or DD.MM.YYYY
+            elif g[5] and g[6] and g[7]:
+                first = int(g[5])
+                second = int(g[6])
+                year = int(g[7])
                 month = second if 1 <= second <= 12 else first
                 return month, year
-            elif g[3] and g[4]:
-                # MM/YYYY (4-digit year)
-                month = int(g[3])
-                year = int(g[4])
-                month = month if 1 <= month <= 12 else None
+            # Group 8,9: MM/YYYY
+            elif g[8] and g[9]:
+                month = int(g[8])
+                year = int(g[9])
+                return (month if 1 <= month <= 12 else None), year
+            # Group 10,11: YYYY/MM
+            elif g[10] and g[11]:
+                return int(g[11]), int(g[10])
+            # Group 12,13,14: DD/MM/YY
+            elif g[12] and g[13] and g[14]:
+                first = int(g[12])
+                second = int(g[13])
+                y = int(g[14])
+                year = 2000 + y if y < 100 else y
+                month = second if 1 <= second <= 12 else first
                 return month, year
-            elif g[5] and g[6]:
-                # YYYY/MM
-                return int(g[6]), int(g[5])
-            elif g[7] and g[8]:
-                # Mon YYYY
-                month_str = g[7][:3].lower()
-                month = _MONTH_NAMES.get(month_str)
-                return month, int(g[8])
-            elif g[9] and g[10] and g[11]:
-                # DD/MM/YY — 2-digit year (e.g. 30.07.22 → July 2022)
-                month = int(g[10])
-                year_2d = int(g[11])
-                year = 2000 + year_2d
-                return month if 1 <= month <= 12 else None, year
-            elif g[12] and g[13]:
-                # MM/YY or DD/YY — 2-digit year (e.g. 07/22)
-                month = int(g[12])
-                year_2d = int(g[13])
-                year = 2000 + year_2d
-                return month if 1 <= month <= 12 else None, year
+            # Group 15,16: MM/YY
+            elif g[15] and g[16]:
+                month = int(g[15])
+                y = int(g[16])
+                year = 2000 + y if y < 100 else y
+                return (month if 1 <= month <= 12 else None), year
         except (ValueError, IndexError):
             pass
 
@@ -432,7 +490,29 @@ def _extract_mfg_date(text: str) -> tuple[Optional[int], Optional[int]]:
         except (ValueError, IndexError):
             pass
 
-    # 3. Standalone date fallback near PKD/LOT/BATCH context
+    # 3. Standalone Alpha-Numeric date fallback (e.g. 01AUG26, 25AUG2024, AUG 2026)
+    match_alpha = _STANDALONE_ALPHA_DATE_PATTERN.search(text)
+    if match_alpha:
+        try:
+            g = match_alpha.groups()
+            if g[0] and g[1] and g[2]:
+                m_str = g[1].lower()
+                month = _MONTH_NAMES.get(m_str)
+                y = int(g[2])
+                year = 2000 + y if y < 100 else y
+                if 2018 <= year <= 2040:
+                    return month, year
+            elif g[3] and g[4]:
+                m_str = g[3].lower()
+                month = _MONTH_NAMES.get(m_str)
+                y = int(g[4])
+                year = 2000 + y if y < 100 else y
+                if 2018 <= year <= 2040:
+                    return month, year
+        except (ValueError, IndexError):
+            pass
+
+    # 4. Standalone date fallback near PKD/LOT/BATCH context
     match_std = _STANDALONE_DATE_PATTERN.search(text)
     if match_std:
         try:
@@ -448,36 +528,91 @@ def _extract_mfg_date(text: str) -> tuple[Optional[int], Optional[int]]:
     return None, None
 
 
+def _extract_manufacturer_info(text: str) -> tuple[Optional[str], Optional[str]]:
+    mfr_name = None
+    mfr_addr = None
+
+    # Find the manufacturer / packer / marketed by prefix
+    prefix_match = _MFR_PREFIX_PATTERN.search(text)
+    if prefix_match:
+        start_idx = prefix_match.end()
+        rest_of_text = text[start_idx:].strip()
+        lines = [l.strip() for l in rest_of_text.split("\n") if l.strip()]
+        
+        if lines:
+            first_line = lines[0]
+            name_candidate = re.split(
+                r",\s*(?:Plot|Sector|MIDC|GIDC|Road|Street|Building|Floor|Chambers|Regd|\d{6})",
+                first_line,
+                flags=re.IGNORECASE,
+            )[0].strip().rstrip(",.")
+            
+            if len(name_candidate) >= 3:
+                mfr_name = name_candidate
+
+            addr_candidates = []
+            if len(lines) > 1:
+                for line in lines[1:]:
+                    if re.match(r"^(?:fssai|Lic|MRP|Net|Batch|LOT|PKD|Packed|Best|Exp|Weight|Store|Customer|Consumer|Manufactured|Marketed)", line, re.IGNORECASE):
+                        break
+                    addr_candidates.append(line)
+            
+            if addr_candidates:
+                mfr_addr = ", ".join(addr_candidates)
+            elif "," in first_line:
+                inline_addr = first_line[len(name_candidate):].strip().lstrip(",").strip()
+                if len(inline_addr) >= 5:
+                    mfr_addr = inline_addr
+
+    # Fallback for address with PIN code anywhere in text
+    if not mfr_addr:
+        pin_match = _ADDRESS_PIN_PATTERN.search(text)
+        if pin_match:
+            addr_part = pin_match.group(1).strip().rstrip(",-")
+            pin = pin_match.group(2).replace(" ", "")
+            if mfr_name and addr_part.startswith(mfr_name):
+                addr_part = addr_part[len(mfr_name):].strip().lstrip(",-").strip()
+            addr_clean = re.sub(r"\s*\n\s*", ", ", addr_part).strip()
+            if len(addr_clean) >= 5:
+                mfr_addr = f"{addr_clean} - {pin}"
+
+    # Fallback for address with explicit keywords (Address:, Regd Office:, etc.)
+    if not mfr_addr:
+        match_kw = _ADDRESS_KEYWORD_PATTERN.search(text)
+        if match_kw:
+            addr_kw = match_kw.group(1).strip().rstrip(",.")
+            addr_kw = re.sub(r"\s*\n\s*", ", ", addr_kw).strip()
+            if len(addr_kw) >= 5:
+                mfr_addr = addr_kw
+
+    # Fallback for address with Location / City / State keywords
+    if not mfr_addr:
+        loc_match = _ADDRESS_LOCATION_PATTERN.search(text)
+        if loc_match:
+            cand = loc_match.group(1).strip().rstrip(",-")
+            if mfr_name and cand.startswith(mfr_name):
+                cand = cand[len(mfr_name):].strip().lstrip(",-").strip()
+            cand_clean = re.sub(r"\s*\n\s*", ", ", cand).strip()
+            if len(cand_clean) >= 8:
+                mfr_addr = cand_clean
+
+    # Clean up formatting
+    if mfr_addr:
+        mfr_addr = re.sub(r",\s*,+", ", ", mfr_addr)
+        mfr_addr = re.sub(r"\s*-\s*-+\s*", " - ", mfr_addr)
+        mfr_addr = re.sub(r"\s+", " ", mfr_addr).strip().rstrip(",.")
+
+    return mfr_name, mfr_addr
+
 
 def _extract_manufacturer_name(text: str) -> Optional[str]:
-    match = _MFR_NAME_PATTERN.search(text)
-    if match:
-        name = match.group(1).strip().rstrip(",.")
-        # Remove trailing address snippets that leaked past the lookahead
-        name = re.split(r"\n", name)[0].strip()
-        if len(name) >= 3:
-            return name
-    return None
+    name, _ = _extract_manufacturer_info(text)
+    return name
 
 
 def _extract_manufacturer_address(text: str) -> Optional[str]:
-    # Try PIN code anchor first (most reliable)
-    match = _ADDRESS_PIN_PATTERN.search(text)
-    if match:
-        addr_raw = match.group(1).strip().rstrip(",.")
-        pin = match.group(2)
-        # Clean up multi-line artefacts
-        addr_clean = re.sub(r"\s*\n\s*", ", ", addr_raw).strip()
-        return f"{addr_clean} - {pin}"
-
-    # Fall back to keyword anchor
-    match_kw = _ADDRESS_KEYWORD_PATTERN.search(text)
-    if match_kw:
-        addr_kw = match_kw.group(1).strip().rstrip(",.")
-        addr_kw = re.sub(r"\s*\n\s*", ", ", addr_kw).strip()
-        if len(addr_kw) >= 5:
-            return addr_kw
-    return None
+    _, addr = _extract_manufacturer_info(text)
+    return addr
 
 
 def _extract_generic_name(text: str, mfr_name: Optional[str]) -> Optional[str]:
