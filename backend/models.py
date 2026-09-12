@@ -40,8 +40,9 @@ class Scan(Base):
 
     id = Column(String(36), primary_key=True, default=lambda: str(uuid.uuid4()))
     user_id = Column(String(36), ForeignKey("users.id", ondelete="SET NULL"), nullable=True, index=True)
-    image_path = Column(String(512), nullable=False)
+    image_path = Column(String(512), nullable=True)
     image_filename = Column(String(255), nullable=True)
+
 
     # Compliance result
     verdict = Column(String(20), nullable=True)  # COMPLIANT | NON_COMPLIANT | NEEDS_REVIEW

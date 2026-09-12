@@ -306,8 +306,8 @@ async def analyze_text_scan(
     try:
         scan = Scan(
             user_id=current_user.id if current_user else None,
-            image_path=None,
-            image_filename=None,
+            image_path="on_device_ocr",
+            image_filename="on_device_ocr.txt",
             verdict=verdict_str,
             overall_confidence=ocr_result.min_confidence,
             needs_manual_review=verdict.needs_manual_review,
