@@ -75,64 +75,73 @@ class OnDeviceOcrService {
   ///
   /// Returns an [OcrResult] with the full merged text.
   static Future<OcrResult> extractText(File imageFile) async {
-    final inputImage = InputImage.fromFile(imageFile);
-
-    // ── Pass 1: Latin recognizer (always available, no download needed) ──────
-    String latinText = '';
-    int latinBlocks = 0;
     try {
-      final latinRecognizer = TextRecognizer(script: TextRecognitionScript.latin);
-      try {
-        final result = await latinRecognizer.processImage(inputImage);
-        latinText = result.text;
-        latinBlocks = result.blocks.length;
-      } finally {
-        await latinRecognizer.close();
+      if (!imageFile.existsSync()) {
+        return const OcrResult(fullText: '', script: 'latin', blockCount: 0);
       }
-      debugPrint('[OCR] Latin pass: ${latinText.length} chars, $latinBlocks blocks');
-    } catch (e) {
-      debugPrint('[OCR] Latin pass failed: $e');
-    }
 
-    // ── Detect if Indic script is present ─────────────────────────────────
-    String indicText = '';
-    int indicBlocks = 0;
+      final inputImage = InputImage.fromFile(imageFile);
 
-    final indicRecognizers = [
-      TextRecognitionScript.devanagiri,  // Hindi, Marathi
-    ];
-
-    for (final script in indicRecognizers) {
+      // ── Pass 1: Latin recognizer (always available) ─────────────────────────
+      String latinText = '';
+      int latinBlocks = 0;
       try {
-        final recognizer = TextRecognizer(script: script);
+        final latinRecognizer = TextRecognizer(script: TextRecognitionScript.latin);
         try {
-          final result = await recognizer.processImage(inputImage);
-          if (result.text.trim().length > indicText.trim().length) {
-            indicText = result.text;
-            indicBlocks = result.blocks.length;
-            debugPrint('[OCR] ${script.name} pass: ${indicText.length} chars');
-          }
+          final result = await latinRecognizer.processImage(inputImage);
+          latinText = result.text;
+          latinBlocks = result.blocks.length;
         } finally {
-          await recognizer.close();
+          await latinRecognizer.close();
         }
+        debugPrint('[OCR] Latin pass: ${latinText.length} chars, $latinBlocks blocks');
       } catch (e) {
-        debugPrint('[OCR] ${script.name} pass failed: $e');
+        debugPrint('[OCR] Latin pass failed: $e');
       }
+
+      // ── Pass 2: Indic recognizer ───────────────────────────────────────────
+      String indicText = '';
+      int indicBlocks = 0;
+
+      final indicRecognizers = [
+        TextRecognitionScript.devanagiri,  // Hindi, Marathi
+      ];
+
+      for (final script in indicRecognizers) {
+        try {
+          final recognizer = TextRecognizer(script: script);
+          try {
+            final result = await recognizer.processImage(inputImage);
+            if (result.text.trim().length > indicText.trim().length) {
+              indicText = result.text;
+              indicBlocks = result.blocks.length;
+              debugPrint('[OCR] ${script.name} pass: ${indicText.length} chars');
+            }
+          } finally {
+            await recognizer.close();
+          }
+        } catch (e) {
+          debugPrint('[OCR] ${script.name} pass skipped or failed: $e');
+        }
+      }
+
+      // ── Merge Latin + Indic ────────────────────────────────────────────────
+      final mergedText = _mergeTexts(latinText, indicText);
+      final detectedScript = _detectScript(mergedText);
+
+      debugPrint('[OCR] Merged: ${mergedText.length} chars, script: $detectedScript');
+
+      return OcrResult(
+        fullText: mergedText,
+        script: detectedScript,
+        blockCount: latinBlocks + indicBlocks,
+      );
+    } catch (topLevelError) {
+      debugPrint('[OCR] Top-level on-device OCR error: $topLevelError');
+      return const OcrResult(fullText: '', script: 'latin', blockCount: 0);
     }
-
-
-    // ── Merge Latin + Indic ────────────────────────────────────────────────
-    final mergedText = _mergeTexts(latinText, indicText);
-    final detectedScript = _detectScript(mergedText);
-
-    debugPrint('[OCR] Merged: ${mergedText.length} chars, script: $detectedScript');
-
-    return OcrResult(
-      fullText: mergedText,
-      script: detectedScript,
-      blockCount: latinBlocks + indicBlocks,
-    );
   }
+
 
   /// Merge two OCR text outputs by deduplicating lines.
   static String _mergeTexts(String text1, String text2) {

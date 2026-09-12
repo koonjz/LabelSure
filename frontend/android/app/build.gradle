@@ -116,4 +116,10 @@ flutter {
 
 dependencies {
     implementation "org.jetbrains.kotlin:kotlin-stdlib-jdk7:2.1.0"
+
+    // Google ML Kit Text Recognition native runtime engines
+    // (Latin is default, Devanagari enables Hindi/Marathi on-device OCR)
+    implementation "com.google.mlkit:text-recognition:16.0.1"
+    implementation "com.google.mlkit:text-recognition-devanagari:16.0.1"
 }
+

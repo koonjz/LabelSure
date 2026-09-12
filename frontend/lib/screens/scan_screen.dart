@@ -103,20 +103,27 @@ class _ScanScreenState extends State<ScanScreen> with SingleTickerProviderStateM
   /// Compress the image to max 1280px & 75% JPEG quality before upload.
   /// Reduces a typical 5 MB photo to ~200–400 KB — 10-20× faster upload.
   Future<File> _compressImage(File original) async {
-    final dir = await getTemporaryDirectory();
-    final outPath =
-        '${dir.path}/labelsure_upload_${DateTime.now().millisecondsSinceEpoch}.jpg';
-    final result = await FlutterImageCompress.compressAndGetFile(
-      original.absolute.path,
-      outPath,
-      quality: 75,
-      minWidth: 800,
-      minHeight: 800,
-      keepExif: true,   // preserve orientation so OCR sees correct side up
-    );
-    // Fall back to original if compression fails
-    return result != null ? File(result.path) : original;
+    try {
+      if (!original.existsSync()) return original;
+      final dir = await getTemporaryDirectory();
+      final outPath =
+          '${dir.path}/labelsure_upload_${DateTime.now().millisecondsSinceEpoch}.jpg';
+      final result = await FlutterImageCompress.compressAndGetFile(
+        original.absolute.path,
+        outPath,
+        quality: 75,
+        minWidth: 800,
+        minHeight: 800,
+        keepExif: true,   // preserve orientation so OCR sees correct side up
+      );
+      // Fall back to original if compression fails
+      return result != null ? File(result.path) : original;
+    } catch (e) {
+      debugPrint('[Scan] Image compression skipped: $e');
+      return original;
+    }
   }
+
 
   Future<void> _uploadScan() async {
     if (_selectedImage == null) return;
