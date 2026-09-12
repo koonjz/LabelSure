@@ -86,11 +86,11 @@ _MFG_DATE_PATTERN = re.compile(
     r"|Manuf(?:actured)?\s+(?:On|Date)"
     r")[:\s]*"
     r"(?:"
-    r"(\d{1,2})[/\-.](\\d{1,2})[/\-.](\d{4})"   # group 1,2,3: DD/MM/YYYY
+    r"(\d{1,2})[/\-.](\d{1,2})[/\.\-](\d{4})"   # group 1,2,3: DD/MM/YYYY
     r"|(\d{1,2})[/\-.](\d{4})"                   # group 4,5: MM/YYYY
     r"|(\d{4})[/\-.](\d{1,2})"                   # group 6,7: YYYY/MM
     r"|([A-Za-z]{3,9})[\s,]+(\d{4})"             # group 8,9: Mon YYYY
-    r"|(\d{1,2})[/\-.](\d{1,2})[/\-.](\d{2})"   # group 10,11,12: DD/MM/YY
+    r"|(\d{1,2})[/\-.](\d{1,2})[/\.\-](\d{2})"  # group 10,11,12: DD/MM/YY
     r"|(\d{1,2})[/\-.](\d{2})"                   # group 13,14: MM/YY
     r")",
     re.IGNORECASE,
@@ -133,9 +133,13 @@ _ADDRESS_KEYWORD_PATTERN = re.compile(
 )
 
 # Batch / Lot No.
+# Note: bare "Batch" must be followed by a qualifier (No./Number/Code/#).
+# "LOT" alone is fine (less ambiguous). "B. No." is also fine.
 _BATCH_PATTERN = re.compile(
-    r"(?:Batch\s*(?:No\.?|Number|Code)?|LOT\s*(?:No\.?|Number)?|B\.?\s*No\.?|Batch\s*#)[:\s\-._]*"
-    r"([A-Za-z0-9/\-_]{2,40})",
+    r"(?:Batch\s+(?:No\.?|Number|Code|#)"   # bare "Batch" MUST have qualifier
+    r"|LOT\s*(?:No\.?|Number)?"             # LOT alone OK
+    r"|B\.?\s*No\.?)[:\s\-._]*"             # B. No.
+    r"([A-Za-z0-9][A-Za-z0-9/\-_]{2,39})",
     re.IGNORECASE,
 )
 
