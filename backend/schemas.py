@@ -85,13 +85,25 @@ class ScanUploadResponse(BaseModel):
     review_reason: Optional[str]
     detected_language: Optional[str]
     raw_ocr_text: Optional[str] = None     # Full OCR text for client-side debugging
-    ocr_engine: Optional[str] = None       # Engine used: paddleocr / tesseract / none
+    ocr_engine: Optional[str] = None       # Engine used: paddleocr / tesseract / mlkit / none
     extracted_fields: List[ExtractedFieldOut]
     rule_results: List[RuleViolationOut]
     created_at: datetime
     processed_at: Optional[datetime]
 
     model_config = {"from_attributes": True}
+
+
+class TextScanRequest(BaseModel):
+    """Request body for /scans/analyze-text — on-device OCR fast path.
+    The Flutter app extracts text using Google ML Kit locally, then sends
+    only the text here for field extraction + compliance rules evaluation.
+    """
+    ocr_text: str                          # Raw text from ML Kit
+    lang_code: str = "en"                  # ISO 639-1 language code
+    sale_price: Optional[float] = None     # For Rule 18(2) MRP vs sale price check
+    font_type: str = "printed"             # printed | embossed
+
 
 
 class ScanListItem(BaseModel):

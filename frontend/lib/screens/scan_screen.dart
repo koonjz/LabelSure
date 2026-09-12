@@ -9,8 +9,10 @@ import 'package:image_picker/image_picker.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:provider/provider.dart';
 import '../config/app_config.dart';
+import '../models/scan.dart';
 import '../services/api_service.dart';
 import '../services/auth_service.dart';
+import '../services/ocr_service.dart';
 import '../utils/permission_helper.dart';
 
 
@@ -130,19 +132,47 @@ class _ScanScreenState extends State<ScanScreen> with SingleTickerProviderStateM
           ? double.tryParse(_salePriceCtrl.text)
           : null;
 
-      // ── Compress before upload ──────────────────────────────────────────
-      final fileToUpload = await _compressImage(_selectedImage!);
-      final origKb = (_selectedImage!.lengthSync() / 1024).round();
-      final compKb  = (fileToUpload.lengthSync()  / 1024).round();
-      debugPrint('Upload: ${origKb}KB → ${compKb}KB '
-          '(${((1 - compKb / origKb) * 100).round()}% smaller)');
-      // ───────────────────────────────────────────────────────────────────
+      // ── Step 1: On-device OCR (fast path — no image upload needed) ────────
+      debugPrint('[Scan] Running on-device OCR with ML Kit...');
+      Scan? scan;
+      try {
+        final ocrResult = await OnDeviceOcrService.extractText(_selectedImage!);
+        debugPrint('[Scan] On-device OCR done: ${ocrResult.blockCount} blocks, '
+            'script=${ocrResult.script}, chars=${ocrResult.fullText.length}');
 
-      final scan = await api.uploadScan(
-        imageFile: fileToUpload,
-        salePrice: salePriceVal,
-        fontType: _fontType,
-      );
+        if (!ocrResult.isEmpty && ocrResult.fullText.trim().length >= 30) {
+          // Good OCR result — send only text to backend (1KB vs 300KB+ image)
+          final langCode = OnDeviceOcrService.scriptToLangCode(ocrResult.script);
+          scan = await api.uploadTextScan(
+            ocrText: ocrResult.fullText,
+            langCode: langCode,
+            salePrice: salePriceVal,
+            fontType: _fontType,
+          );
+          debugPrint('[Scan] Text-based scan complete (on-device OCR path).');
+        } else {
+          debugPrint('[Scan] On-device OCR produced insufficient text '
+              '(${ocrResult.fullText.trim().length} chars) — falling back to image upload.');
+        }
+      } catch (ocrErr) {
+        debugPrint('[Scan] On-device OCR failed: $ocrErr — falling back to image upload.');
+      }
+
+      // ── Step 2: Fallback — upload compressed image if on-device OCR failed ─
+      if (scan == null) {
+        debugPrint('[Scan] Using image upload fallback...');
+        final fileToUpload = await _compressImage(_selectedImage!);
+        final origKb = (_selectedImage!.lengthSync() / 1024).round();
+        final compKb  = (fileToUpload.lengthSync()  / 1024).round();
+        debugPrint('[Scan] Upload: ${origKb}KB → ${compKb}KB '
+            '(${((1 - compKb / origKb) * 100).round()}% smaller)');
+
+        scan = await api.uploadScan(
+          imageFile: fileToUpload,
+          salePrice: salePriceVal,
+          fontType: _fontType,
+        );
+      }
 
       if (mounted) {
         context.push('/scan-result', extra: scan);

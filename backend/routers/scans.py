@@ -28,7 +28,7 @@ from backend.processing.nlp_lang import detect_language
 from backend.processing.field_extractor import extract_fields
 from backend.rules import evaluate_label, LabelData
 from backend.schemas import (
-    ScanDetail, ScanListItem, ScanListResponse, ScanUploadResponse,
+    ScanDetail, ScanListItem, ScanListResponse, ScanUploadResponse, TextScanRequest,
     ExtractedFieldOut, RuleViolationOut,
 )
 
@@ -243,6 +243,160 @@ async def upload_scan(
             detail=f"Failed to process and save scan: {exc}",
         )
 
+
+# ─────────────────────────────────────────────────────────────────────────────
+# POST /scans/analyze-text  (on-device OCR fast path)
+# Flutter app sends pre-extracted text from Google ML Kit — no image upload needed.
+# ─────────────────────────────────────────────────────────────────────────────
+
+@router.post("/analyze-text", response_model=ScanUploadResponse, status_code=201)
+async def analyze_text_scan(
+    body: TextScanRequest,
+    db: AsyncSession = Depends(get_db),
+    current_user: Optional[User] = Depends(get_optional_user),
+):
+    """
+    Fast-path endpoint for on-device OCR.
+
+    The Flutter app runs Google ML Kit OCR locally, then sends only the extracted
+    text here. We skip image upload/storage and go straight to:
+      field extraction → compliance rules → return verdict.
+
+    This is ~10x faster than /scans/upload because:
+      - No multipart file transfer
+      - No server-side OCR (Tesseract/PaddleOCR)
+      - Only field extraction + rules evaluation (~100ms)
+    """
+    logger.info(
+        "analyze-text: lang=%s, chars=%d, user=%s",
+        body.lang_code, len(body.ocr_text),
+        current_user.id if current_user else "anonymous",
+    )
+
+    if not body.ocr_text.strip():
+        raise HTTPException(status_code=422, detail="ocr_text must not be empty.")
+
+    # Build a minimal OCRResult from the provided text
+    from backend.processing.ocr_engine import OCRResult
+    ocr_result = OCRResult(
+        full_text=body.ocr_text,
+        boxes=[],
+        avg_confidence=0.9,    # ML Kit is generally high confidence
+        min_confidence=0.85,
+        engine_used="mlkit",
+    )
+
+    # Field extraction
+    label_data = extract_fields(ocr_result, lang_code=body.lang_code)
+    if body.sale_price is not None:
+        label_data.entered_sale_price = body.sale_price
+    if body.font_type:
+        label_data.font_type = body.font_type
+
+    # Rules evaluation
+    verdict = evaluate_label(label_data, ocr_confidence=ocr_result.min_confidence)
+    verdict_str = (
+        "NEEDS_REVIEW" if verdict.needs_manual_review
+        else "COMPLIANT" if verdict.is_compliant
+        else "NON_COMPLIANT"
+    )
+
+    now_dt = datetime.now(timezone.utc)
+
+    try:
+        scan = Scan(
+            user_id=current_user.id if current_user else None,
+            image_path=None,
+            image_filename=None,
+            verdict=verdict_str,
+            overall_confidence=ocr_result.min_confidence,
+            needs_manual_review=verdict.needs_manual_review,
+            review_reason=verdict.review_reason,
+            detected_language=body.lang_code,
+            created_at=now_dt,
+            processed_at=now_dt,
+            entered_sale_price=body.sale_price,
+        )
+        db.add(scan)
+        await db.flush()
+
+        field_map = {
+            "generic_name":         label_data.generic_name,
+            "manufacturer_name":    label_data.manufacturer_name,
+            "manufacturer_address": label_data.manufacturer_address,
+            "net_quantity_value":   str(label_data.net_quantity_value) if label_data.net_quantity_value else None,
+            "net_quantity_unit":    label_data.net_quantity_unit,
+            "mrp":                  str(label_data.mrp) if label_data.mrp else None,
+            "manufacture_month":    str(label_data.manufacture_month) if label_data.manufacture_month else None,
+            "manufacture_year":     str(label_data.manufacture_year) if label_data.manufacture_year else None,
+            "batch_number":         label_data.batch_number,
+            "expiry_date":          label_data.expiry_date,
+            "fssai_license":        label_data.fssai_license,
+            "consumer_care":        label_data.consumer_care,
+            "ocr_source":           "mlkit_on_device",
+        }
+        for fname, fval in field_map.items():
+            db.add(ExtractedField(
+                scan_id=scan.id,
+                field_name=fname,
+                field_value=fval,
+                confidence=ocr_result.avg_confidence,
+            ))
+
+        rule_results_out = []
+        for rr in verdict.rule_results:
+            sev = rr.severity.value if hasattr(rr.severity, "value") else str(rr.severity)
+            db.add(RuleViolation(
+                scan_id=scan.id,
+                rule_id=rr.rule_id,
+                rule_name=rr.rule_name,
+                passed=rr.passed,
+                explanation=rr.explanation,
+                severity=sev,
+            ))
+            rule_results_out.append(RuleViolationOut(
+                rule_id=rr.rule_id,
+                rule_name=rr.rule_name,
+                passed=rr.passed,
+                explanation=rr.explanation,
+                severity=sev,
+            ))
+
+        db.add(AuditLog(
+            scan_id=scan.id,
+            performed_by=current_user.id if current_user else None,
+            action="TEXT_SCAN",
+            detail=f"Verdict: {verdict_str} | Engine: mlkit | Chars: {len(body.ocr_text)}",
+            timestamp=now_dt,
+        ))
+
+        await db.commit()
+        await db.refresh(scan)
+
+        return ScanUploadResponse(
+            scan_id=scan.id,
+            verdict=verdict_str,
+            overall_confidence=ocr_result.min_confidence,
+            needs_manual_review=verdict.needs_manual_review,
+            review_reason=verdict.review_reason,
+            detected_language=body.lang_code,
+            raw_ocr_text=body.ocr_text[:4000],
+            ocr_engine="mlkit",
+            extracted_fields=[
+                ExtractedFieldOut(
+                    field_name=k, field_value=v,
+                    confidence=ocr_result.avg_confidence, bounding_box=None,
+                )
+                for k, v in field_map.items() if v is not None
+            ],
+            rule_results=rule_results_out,
+            created_at=scan.created_at or now_dt,
+            processed_at=scan.processed_at or now_dt,
+        )
+    except Exception as exc:
+        await db.rollback()
+        logger.error("Failed to persist text scan: %s", exc, exc_info=True)
+        raise HTTPException(status_code=500, detail=f"Failed to process scan: {exc}")
 
 
 # ─────────────────────────────────────────────────────────────────────────────

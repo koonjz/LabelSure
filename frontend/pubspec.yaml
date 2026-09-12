@@ -18,6 +18,11 @@ dependencies:
   camera: ^0.11.0+2
   flutter_image_compress: ^2.3.0   # Compress JPEG before upload (native speed)
 
+  # On-device OCR (Google ML Kit) — no backend needed for OCR!
+  # Models (~8MB each) are downloaded once from Google and cached on-device.
+  # Supports: English, Hindi (Devanagari), Tamil, Telugu, Kannada, Malayalam.
+  google_mlkit_text_recognition: ^0.13.0
+
   # Secure storage for JWT token
   flutter_secure_storage: ^9.2.2
 

@@ -189,6 +189,30 @@ class ApiService {
     }
   }
 
+  /// Send pre-extracted OCR text to the backend (on-device OCR fast path).
+  /// Much faster than uploadScan — sends only ~1KB of text instead of a full image.
+  Future<Scan> uploadTextScan({
+    required String ocrText,
+    required String langCode,
+    double? salePrice,
+    String fontType = 'printed',
+  }) async {
+    try {
+      final response = await _dio.post(
+        '/scans/analyze-text',
+        data: {
+          'ocr_text': ocrText,
+          'lang_code': langCode,
+          if (salePrice != null) 'sale_price': salePrice,
+          'font_type': fontType,
+        },
+      );
+      return Scan.fromJson(response.data as Map<String, dynamic>);
+    } catch (e) {
+      throw _wrap(e, '/scans/analyze-text');
+    }
+  }
+
   /// List scans (officers: all; consumers: own).
   Future<Map<String, dynamic>> listScans({
     String? verdict,
