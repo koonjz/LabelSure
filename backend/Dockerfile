@@ -87,10 +87,10 @@ HEALTHCHECK --interval=30s --timeout=10s --start-period=20s --retries=3 \
 # Binds dynamically to $PORT provided by Render, Railway, or Docker Compose.
 CMD ["sh", "-c", \
      "gunicorn backend.main:app \
-       --workers ${WORKERS:-2} \
+       --workers ${WORKERS:-3} \
        --worker-class uvicorn.workers.UvicornWorker \
        --bind 0.0.0.0:10000 \
-       --timeout 120 \
+       --timeout 180 \
        --keep-alive 5 \
        --access-logfile - \
        --error-logfile - \

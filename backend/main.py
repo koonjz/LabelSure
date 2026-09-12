@@ -8,15 +8,29 @@ Dev entry point:
   uvicorn backend.main:app --reload --host 0.0.0.0 --port 8000
 """
 from contextlib import asynccontextmanager
+import asyncio
 import logging
-import json
 import os
 import time
+
+try:
+    import orjson
+    def _json_dumps(obj) -> str:
+        return orjson.dumps(obj).decode()
+except ImportError:
+    import json
+    def _json_dumps(obj) -> str:
+        return json.dumps(obj)
 
 from fastapi import FastAPI, Request, status
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from fastapi.staticfiles import StaticFiles
+
+try:
+    from fastapi.responses import ORJSONResponse as _FastResponse
+except ImportError:
+    _FastResponse = JSONResponse  # type: ignore
 
 from backend.config import get_settings
 from backend.database import create_tables, engine
@@ -103,6 +117,30 @@ async def lifespan(app: FastAPI):
     await create_tables()
     os.makedirs(settings.upload_dir, exist_ok=True)
     logger.info("Database tables ready. Upload dir: %s", settings.upload_dir)
+
+    # ── Pre-warm OCR model ─────────────────────────────────────────────
+    # Load PaddleOCR (or Tesseract) in a thread so it doesn't block the event
+    # loop. The model download + init can take 10-30 s on first cold start.
+    # After this, every subsequent scan request hits a warm model instantly.
+    # ──────────────────────────────────────────────────────────────
+    def _warmup_ocr():
+        try:
+            from backend.processing.ocr_engine import _PADDLE_AVAILABLE, _get_paddle
+            if _PADDLE_AVAILABLE:
+                logger.info("Pre-warming PaddleOCR English model...")
+                _get_paddle("en")   # loads model weights into RAM
+                logger.info("PaddleOCR model warm-up complete.")
+            else:
+                import pytesseract
+                pytesseract.get_tesseract_version()  # verify tesseract is reachable
+                logger.info("Tesseract available (version checked).")
+        except Exception as exc:
+            logger.warning("OCR warm-up failed (non-fatal): %s", exc)
+
+    loop = asyncio.get_event_loop()
+    await loop.run_in_executor(None, _warmup_ocr)
+    # ──────────────────────────────────────────────────────────────
+
     yield
     logger.info("%s shutting down.", settings.app_name)
     await engine.dispose()
@@ -121,6 +159,7 @@ app = FastAPI(
     ),
     version=settings.version,
     lifespan=lifespan,
+    default_response_class=_FastResponse,   # orjson for all responses
     docs_url="/docs" if settings.debug else None,
     redoc_url="/redoc" if settings.debug else None,
     openapi_url="/openapi.json" if settings.debug else None,

@@ -95,6 +95,44 @@ def _get_paddle(lang_code: str = "en") -> "PaddleOCR":
     return _paddle_instances[pl]
 
 
+# ─────────────────────────────────────────────────────────────────────────────
+# Image pre-processing — resize to max 1280px before OCR
+# Large images (e.g. 4032×3024 from iPhone) massively slow down both
+# PaddleOCR and Tesseract without improving text recognition accuracy.
+# 1280px long-side is the sweet spot: fast OCR + full text legibility.
+# ─────────────────────────────────────────────────────────────────────────────
+_OCR_MAX_PX = 1280
+
+def _resize_for_ocr(image_path: str) -> str:
+    """
+    If the image is larger than _OCR_MAX_PX on either side, resize it and
+    save a temporary copy. Returns the path to use for OCR (original or resized).
+    """
+    if not _CV2_AVAILABLE:
+        return image_path
+    try:
+        img = cv2.imread(image_path)
+        if img is None:
+            return image_path
+        h, w = img.shape[:2]
+        max_side = max(h, w)
+        if max_side <= _OCR_MAX_PX:
+            return image_path          # already small enough
+        scale = _OCR_MAX_PX / max_side
+        new_w = int(w * scale)
+        new_h = int(h * scale)
+        resized = cv2.resize(img, (new_w, new_h), interpolation=cv2.INTER_AREA)
+        # Write to a temp path alongside the original
+        base, ext = image_path.rsplit(".", 1) if "." in image_path else (image_path, "jpg")
+        tmp_path = f"{base}_ocr_resized.jpg"
+        cv2.imwrite(tmp_path, resized, [cv2.IMWRITE_JPEG_QUALITY, 92])
+        logger.debug("Resized %dx%d → %dx%d for OCR (%s)", w, h, new_w, new_h, tmp_path)
+        return tmp_path
+    except Exception as exc:
+        logger.warning("Image resize for OCR failed: %s", exc)
+        return image_path
+
+
 def run_paddleocr(image_path: str, lang_code: str = "en") -> OCRResult:
     """
     Run PaddleOCR on the image.
@@ -107,9 +145,12 @@ def run_paddleocr(image_path: str, lang_code: str = "en") -> OCRResult:
     if not _PADDLE_AVAILABLE:
         raise RuntimeError("PaddleOCR is not installed.")
 
+    # Resize before OCR for speed
+    ocr_path = _resize_for_ocr(image_path)
+
     # --- Pass 1: English model (always run for Latin text / numbers) ---
     en_ocr = _get_paddle("en")
-    raw_en = en_ocr.ocr(image_path, cls=True)
+    raw_en = en_ocr.ocr(ocr_path, cls=True)
     boxes_en: list[OCRBox] = []
     if raw_en and raw_en[0]:
         for line in raw_en[0]:
@@ -121,7 +162,7 @@ def run_paddleocr(image_path: str, lang_code: str = "en") -> OCRResult:
     if lang_code != "en":
         try:
             indic_ocr = _get_paddle(lang_code)
-            raw_indic = indic_ocr.ocr(image_path, cls=True)
+            raw_indic = indic_ocr.ocr(ocr_path, cls=True)
             if raw_indic and raw_indic[0]:
                 for line in raw_indic[0]:
                     bbox, (text, conf) = line
@@ -249,7 +290,9 @@ def run_tesseract(image_path: str, lang_code: str = "en") -> OCRResult:
     }
     tess_lang = tess_lang_map.get(lang_code, "eng")
 
-    pil_img = PILImage.open(image_path)
+    # Resize for speed before loading into PIL
+    ocr_path = _resize_for_ocr(image_path)
+    pil_img = PILImage.open(ocr_path)
     variants = _preprocess_pil(pil_img)
 
     best_text = ""
