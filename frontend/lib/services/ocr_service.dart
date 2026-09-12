@@ -82,45 +82,44 @@ class OnDeviceOcrService {
     int latinBlocks = 0;
     try {
       final latinRecognizer = TextRecognizer(script: TextRecognitionScript.latin);
-      final result = await latinRecognizer.processImage(inputImage);
-      latinText = result.text;
-      latinBlocks = result.blocks.length;
-      await latinRecognizer.close();
+      try {
+        final result = await latinRecognizer.processImage(inputImage);
+        latinText = result.text;
+        latinBlocks = result.blocks.length;
+      } finally {
+        await latinRecognizer.close();
+      }
       debugPrint('[OCR] Latin pass: ${latinText.length} chars, $latinBlocks blocks');
     } catch (e) {
       debugPrint('[OCR] Latin pass failed: $e');
     }
 
     // ── Detect if Indic script is present ─────────────────────────────────
-    // Even if Latin pass gets MRP/weight, Indic pass gets manufacturer name etc.
-    // We always run Devanagari for Indian food labels (most common Indic script).
     String indicText = '';
     int indicBlocks = 0;
 
-    // NOTE: google_mlkit_text_recognition v0.13.x supports:
-    //   latin, chinese, devanagiri (Hindi/Marathi), japanese, korean
-    // Tamil, Telugu, Kannada, Malayalam are NOT in this SDK version.
-    // We run devanagiri for all Indic scripts (covers Hindi/Marathi labels).
-    // Latin pass already handles English numbers, MRP, weights.
     final indicRecognizers = [
       TextRecognitionScript.devanagiri,  // Hindi, Marathi
     ];
 
-    // Try each Indic model and take the one that produces the most text
     for (final script in indicRecognizers) {
       try {
         final recognizer = TextRecognizer(script: script);
-        final result = await recognizer.processImage(inputImage);
-        await recognizer.close();
-        if (result.text.trim().length > indicText.trim().length) {
-          indicText = result.text;
-          indicBlocks = result.blocks.length;
-          debugPrint('[OCR] ${script.name} pass: ${indicText.length} chars');
+        try {
+          final result = await recognizer.processImage(inputImage);
+          if (result.text.trim().length > indicText.trim().length) {
+            indicText = result.text;
+            indicBlocks = result.blocks.length;
+            debugPrint('[OCR] ${script.name} pass: ${indicText.length} chars');
+          }
+        } finally {
+          await recognizer.close();
         }
       } catch (e) {
         debugPrint('[OCR] ${script.name} pass failed: $e');
       }
     }
+
 
     // ── Merge Latin + Indic ────────────────────────────────────────────────
     final mergedText = _mergeTexts(latinText, indicText);

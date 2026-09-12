@@ -12,6 +12,7 @@ class AuthService extends ChangeNotifier {
 
   static const _androidOptions = AndroidOptions(
     encryptedSharedPreferences: true,
+    resetOnError: true,
   );
   static const _iosOptions = IOSOptions(
     accessibility: KeychainAccessibility.first_unlock,
@@ -41,32 +42,49 @@ class AuthService extends ChangeNotifier {
     _isLoading = true;
     notifyListeners();
     try {
-      final token = await _storage.read(key: _tokenKey);
+      String? token;
+      try {
+        token = await _storage.read(key: _tokenKey);
+      } catch (readErr) {
+        debugPrint('[Auth] Failed to read token from secure storage: $readErr');
+        try {
+          await _storage.deleteAll();
+        } catch (_) {}
+      }
+
       if (token != null && token.isNotEmpty) {
         _api.setToken(token);
 
         // 1. Restore cached user profile immediately if available
-        final userJson = await _storage.read(key: _userKey);
-        if (userJson != null && userJson.isNotEmpty) {
-          try {
-            final map = jsonDecode(userJson) as Map<String, dynamic>;
-            _user = User.fromJson(map);
-          } catch (_) {}
+        try {
+          final userJson = await _storage.read(key: _userKey);
+          if (userJson != null && userJson.isNotEmpty) {
+            try {
+              final map = jsonDecode(userJson) as Map<String, dynamic>;
+              _user = User.fromJson(map);
+            } catch (_) {}
+          }
+        } catch (userReadErr) {
+          debugPrint('[Auth] Failed to read user profile: $userReadErr');
         }
 
         // 2. Validate/refresh user profile from server
         try {
           final freshUser = await _api.getMe();
           _user = freshUser;
-          await _storage.write(
-            key: _userKey,
-            value: jsonEncode(freshUser.toJson()),
-          );
+          try {
+            await _storage.write(
+              key: _userKey,
+              value: jsonEncode(freshUser.toJson()),
+            );
+          } catch (_) {}
         } on ApiException catch (e) {
           // If token is invalid or expired (401), clean up session
           if (e.statusCode == 401) {
-            await _storage.delete(key: _tokenKey);
-            await _storage.delete(key: _userKey);
+            try {
+              await _storage.delete(key: _tokenKey);
+              await _storage.delete(key: _userKey);
+            } catch (_) {}
             _api.clearToken();
             _user = null;
           }
@@ -75,13 +93,14 @@ class AuthService extends ChangeNotifier {
           // Network or parsing error: keep token and cached user
         }
       }
-    } catch (_) {
-      // Storage read failure
+    } catch (e) {
+      debugPrint('[Auth] tryAutoLogin unhandled exception: $e');
     } finally {
       _isLoading = false;
       notifyListeners();
     }
   }
+
 
   Future<bool> login(String email, String password) async {
     _isLoading = true;

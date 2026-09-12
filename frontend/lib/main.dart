@@ -13,13 +13,18 @@ void main() async {
   final authService = AuthService(apiService);
 
   // Restore saved session from secure storage before launching UI
-  await authService.tryAutoLogin();
+  try {
+    await authService.tryAutoLogin();
+  } catch (e) {
+    debugPrint('[Main] AutoLogin failed on startup: $e');
+  }
 
   runApp(LabelSureApp(
     apiService: apiService,
     authService: authService,
   ));
 }
+
 
 class LabelSureApp extends StatefulWidget {
   final ApiService apiService;

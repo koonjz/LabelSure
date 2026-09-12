@@ -1,3 +1,4 @@
+import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:labelsure/main.dart';
 import 'package:labelsure/services/api_service.dart';
@@ -14,6 +15,8 @@ void main() {
     ));
 
     expect(find.byType(LabelSureApp), findsOneWidget);
+    await tester.pump(const Duration(milliseconds: 100));
   });
 }
+
 
