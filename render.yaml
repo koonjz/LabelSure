@@ -20,4 +20,5 @@ services:
       - key: LOG_FORMAT
         value: "json"
       - key: WORKERS
-        value: "2"
+        value: "1"
+

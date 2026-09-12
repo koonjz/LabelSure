@@ -301,7 +301,7 @@ async def analyze_text_scan(
         else "NON_COMPLIANT"
     )
 
-    now_dt = datetime.now(timezone.utc)
+    now_dt = datetime.utcnow()
 
     try:
         scan = Scan(
