@@ -23,9 +23,9 @@ logger = logging.getLogger(__name__)
 
 # MRP patterns:
 # Priority 1: Labelled MRP (explicit declaration on the label)
-# Handles: "MRP ₹150/-", "MRP : 150", "M.R.P. : ₹150.00",
-#          "MRP (incl. of all taxes) : 150", "MRP Rs. 20.00"
-#          "MRP. 250/-", "M R P : 18", "M.R.P Rs 25/-"
+# Handles: "MRP ₹150/-", "MRP : 150", "M.R.P. : ₹150.00", "MRP ₹: 5.00"
+#          "MRP (incl. of all taxes) : 150", "MRP Rs. 20.00", "MRP ₹: 5.00 (Incl. of all taxes)"
+#          "MRP. 250/-", "M R P : 18", "M.R.P Rs 25/-", "MRP: 5"
 _LABELLED_MRP_PATTERN = re.compile(
     r"(?:"
     r"M\.?\s*R\.?\s*P\.?"                      # MRP, M.R.P., M R P, M. R. P.
@@ -34,20 +34,20 @@ _LABELLED_MRP_PATTERN = re.compile(
     r"|Max(?:imum|\.)?\s+Retail\s+Price"       # Maximum Retail Price
     r"|Max\.?\s*Ret\.?\s*Price"                # Max. Ret. Price
     r"|Retail\s+Price"                         # Retail Price
-    r"|(?<!\w)Price(?!\s*:\s*\w{10,})"        # Lone "Price" keyword (not "Price: Unavailable...")
+    r"|(?<!\w)Price(?!\s*:\s*\w{10,})"        # Lone "Price" keyword
     r")"
-    r"(?:\s*\([^)]*(?:tax|all|incl)[^)]*\))?"  # Optional (Incl. of all taxes)
+    r"(?:\s*\([^)]*(?:tax|all|incl)[^)]*\))?"  # Optional (Incl. of all taxes) before amount
     r"[:\s\-._]*"                              # Separators
     r"(?:Rs\.?|INR|₹|Re\.?|[?*`'~^|\\/])?"    # Optional currency symbol or OCR artifact
     r"[:\s\-._]*"                              # Secondary separators
-    r"(\d{1,6}(?:[.,]\d{1,2})?)"              # Numerical amount (GROUP 1)
-    r"(?:\s*/\s*-|\s*/-|\b)",                  # Optional /- suffix
+    r"(\d{1,6}(?:\s*[.,]\s*\d{1,2})?)"        # Numerical amount (GROUP 1)
+    r"(?:\s*(?:/\s*-|/-|\([^)]*(?:tax|all|incl)[^)]*\)|\b))",  # Optional /- or (Incl. of all taxes) after
     re.IGNORECASE,
 )
 
-# Priority 2: Standalone currency price fallback (e.g. "₹ 150/-", "Rs. 150/-", "₹150")
+# Priority 2: Standalone currency price fallback (e.g. "₹ 150/-", "Rs. 150/-", "₹: 5.00", "₹5.00")
 _STANDALONE_PRICE_PATTERN = re.compile(
-    r"(?:Rs\.?|INR|₹|Re\.?)\s*(\d{1,6}(?:[.,]\d{1,2})?)\s*(?:/\s*-|/-|\b)",
+    r"(?:Rs\.?|INR|₹|Re\.?)\s*[:\-._]?\s*(\d{1,6}(?:\s*[.,]\s*\d{1,2})?)\s*(?:/\s*-|/-|\b)",
     re.IGNORECASE,
 )
 
@@ -58,14 +58,14 @@ _LABELLED_NET_QTY_PATTERN = re.compile(
     r"(?:Net\s+(?:Wt\.?|Weight|Contents?|Quantity|Vol\.?|Volume|Qty\.?|Cont\.?)"
     r"|NET\s+(?:WT\.?|WEIGHT|CONTENTS?|QUANTITY|VOL\.?|VOLUME|QTY\.?|CONT\.?)"
     r"|Nett\s+(?:Wt\.?|Weight|Vol\.?|Qty\.?))[:\s]*"
-    r"(\d+(?:[.,]\d+)?)\s*"
+    r"(\d+(?:\s*[.,]\s*\d+)?)\s*"
     r"(g(?:m(?:s)?)?|kg(?:s)?|ml|millilitre|l(?:tr?(?:e)?)?|litre|liter|pcs?|nos?|pieces?|number)\b",
     re.IGNORECASE,
 )
 
-# Priority 2: Standalone declaration (e.g. just "250 g" or "500ml")
+# Priority 2: Standalone declaration (e.g. just "250 g" or "500ml" or "35g")
 _STANDALONE_NET_QTY_PATTERN = re.compile(
-    r"(?<!\d)(\d+(?:[.,]\d+)?)\s*"
+    r"(?<!\d)(\d+(?:\s*[.,]\s*\d+)?)\s*"
     r"(g(?:m(?:s)?)?|kg(?:s)?|ml|millilitre|l(?:tr?(?:e)?)?|litre|liter|pcs?|nos?|pieces?|number)\b",
     re.IGNORECASE,
 )
@@ -79,7 +79,7 @@ _MFG_DATE_PATTERN = re.compile(
     r"|Date\s+of\s+(?:Mfg|Manufacture|Mfgr|Manuf)\.?"
     r"|MFD\.?"
     r"|Packed?\s*(?:On|Date|Dt\.?)?\.?"
-    r"|PKD\.?(?:/[^:]*)?"         # PKD./ or PKD / USE BY DATE etc.
+    r"|PKD\.?(?:/[^:\n]*)?"        # PKD./ or PKD / USE BY DATE etc.
     r"|Mfg\.?/Pkg\.?"
     r"|Manufacturing\s+Date"
     r"|Packing\s+Date"
@@ -94,6 +94,16 @@ _MFG_DATE_PATTERN = re.compile(
     r"|(\d{1,2})[/\-.](\d{2})"                   # group 13,14: MM/YY
     r")",
     re.IGNORECASE,
+)
+
+# Date pair pattern fallback: "30.07.22/29.01.23" (MFG/EXP pair common on Indian labels)
+_DATE_PAIR_PATTERN = re.compile(
+    r"(\d{1,2})[./\-](\d{1,2})[./\-](\d{2,4})\s*/\s*(\d{1,2})[./\-](\d{1,2})[./\-](\d{2,4})"
+)
+
+# Standalone date fallback (DD/MM/YYYY or DD.MM.YY or MM/YYYY)
+_STANDALONE_DATE_PATTERN = re.compile(
+    r"\b(\d{1,2})[./\-](\d{1,2})[./\-](\d{2,4})\b"
 )
 
 # Month name → number
@@ -218,7 +228,8 @@ def _normalize_ocr_text(text: str) -> str:
     """
     Fix common OCR transcription errors before regex extraction:
     - Reconnect broken lines (e.g. "MR\nP" → "MRP")
-    - Normalize confusable characters (₹ ← ?, *, 2)
+    - Normalize confusable characters (₹ ← ?, *, 2, ₹:)
+    - Fix spacing around decimals (e.g. "5 . 00" -> "5.00")
     - Fix spacing around colons and digits
     """
     # Join lines broken in the middle of a keyword
@@ -229,6 +240,12 @@ def _normalize_ocr_text(text: str) -> str:
     # Replace lone symbol before a digit (price context) with ₹
     text = re.sub(r"(?<!\w)[?*`'~^|\\](?=\s*\d{1,6})", "₹", text)
 
+    # Fix space inside decimal numbers (e.g. "5 . 00" or "5. 00" -> "5.00")
+    text = re.sub(r"(\d+)\s*\.\s*(\d{2})\b", r"\1.\2", text)
+
+    # Fix space inside dotted dates (e.g. "30 . 07 . 22" -> "30.07.22")
+    text = re.sub(r"(\d{1,2})\s*\.\s*(\d{1,2})\s*\.\s*(\d{2,4})", r"\1.\2.\3", text)
+
     # Normalize line endings
     text = text.replace("\r\n", "\n").replace("\r", "\n")
 
@@ -236,6 +253,7 @@ def _normalize_ocr_text(text: str) -> str:
     text = re.sub(r"\n{3,}", "\n\n", text)
 
     return text
+
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -355,47 +373,75 @@ def _extract_net_qty(text: str) -> tuple[Optional[float], Optional[str]]:
 
 
 def _extract_mfg_date(text: str) -> tuple[Optional[int], Optional[int]]:
+    # 1. Primary: Keyword-anchored Mfg/PKD date
     match = _MFG_DATE_PATTERN.search(text)
-    if not match:
-        return None, None
-    g = match.groups()  # 14 groups total (indices 0-13)
-    try:
-        if g[0] and g[1] and g[2]:
-            # DD/MM/YYYY or MM/DD/YYYY (e.g. 09/05/2025)
-            first = int(g[0])
-            second = int(g[1])
-            year = int(g[2])
-            month = second if 1 <= second <= 12 else first
-            return month, year
-        elif g[3] and g[4]:
-            # MM/YYYY (4-digit year)
-            month = int(g[3])
-            year = int(g[4])
-            month = month if 1 <= month <= 12 else None
-            return month, year
-        elif g[5] and g[6]:
-            # YYYY/MM
-            return int(g[6]), int(g[5])
-        elif g[7] and g[8]:
-            # Mon YYYY
-            month_str = g[7][:3].lower()
-            month = _MONTH_NAMES.get(month_str)
-            return month, int(g[8])
-        elif g[9] and g[10] and g[11]:
-            # DD/MM/YY — 2-digit year (e.g. 30.07.22 → July 2022)
-            month = int(g[10])
-            year_2d = int(g[11])
-            year = 2000 + year_2d
-            return month if 1 <= month <= 12 else None, year
-        elif g[12] and g[13]:
-            # MM/YY or DD/YY — 2-digit year (e.g. 07/22)
-            month = int(g[12])
-            year_2d = int(g[13])
-            year = 2000 + year_2d
-            return month if 1 <= month <= 12 else None, year
-    except (ValueError, IndexError):
-        pass
+    if match:
+        g = match.groups()  # 14 groups total (indices 0-13)
+        try:
+            if g[0] and g[1] and g[2]:
+                # DD/MM/YYYY or MM/DD/YYYY (e.g. 09/05/2025)
+                first = int(g[0])
+                second = int(g[1])
+                year = int(g[2])
+                month = second if 1 <= second <= 12 else first
+                return month, year
+            elif g[3] and g[4]:
+                # MM/YYYY (4-digit year)
+                month = int(g[3])
+                year = int(g[4])
+                month = month if 1 <= month <= 12 else None
+                return month, year
+            elif g[5] and g[6]:
+                # YYYY/MM
+                return int(g[6]), int(g[5])
+            elif g[7] and g[8]:
+                # Mon YYYY
+                month_str = g[7][:3].lower()
+                month = _MONTH_NAMES.get(month_str)
+                return month, int(g[8])
+            elif g[9] and g[10] and g[11]:
+                # DD/MM/YY — 2-digit year (e.g. 30.07.22 → July 2022)
+                month = int(g[10])
+                year_2d = int(g[11])
+                year = 2000 + year_2d
+                return month if 1 <= month <= 12 else None, year
+            elif g[12] and g[13]:
+                # MM/YY or DD/YY — 2-digit year (e.g. 07/22)
+                month = int(g[12])
+                year_2d = int(g[13])
+                year = 2000 + year_2d
+                return month if 1 <= month <= 12 else None, year
+        except (ValueError, IndexError):
+            pass
+
+    # 2. Date pair fallback: "30.07.22/29.01.23" (MFG/EXP pair common on Indian labels)
+    match_pair = _DATE_PAIR_PATTERN.search(text)
+    if match_pair:
+        try:
+            g = match_pair.groups()
+            d1, m1, y1 = int(g[0]), int(g[1]), int(g[2])
+            month = m1 if 1 <= m1 <= 12 else d1
+            year = y1 if y1 >= 1000 else (2000 + y1 if y1 < 70 else 1900 + y1)
+            if 1 <= month <= 12 and 2000 <= year <= 2040:
+                return month, year
+        except (ValueError, IndexError):
+            pass
+
+    # 3. Standalone date fallback near PKD/LOT/BATCH context
+    match_std = _STANDALONE_DATE_PATTERN.search(text)
+    if match_std:
+        try:
+            g = match_std.groups()
+            d1, m1, y1 = int(g[0]), int(g[1]), int(g[2])
+            month = m1 if 1 <= m1 <= 12 else d1
+            year = y1 if y1 >= 1000 else (2000 + y1 if y1 < 70 else 1900 + y1)
+            if 1 <= month <= 12 and 2018 <= year <= 2035:
+                return month, year
+        except (ValueError, IndexError):
+            pass
+
     return None, None
+
 
 
 def _extract_manufacturer_name(text: str) -> Optional[str]:
