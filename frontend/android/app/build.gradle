@@ -42,13 +42,14 @@ android {
         applicationId "com.labelsure.app"
 
         // minSdk 21: satisfies image_picker, camera, google_mlkit, flutter_secure_storage
-        minSdkVersion 21
+        minSdkVersion flutter.minSdkVersion
         targetSdkVersion 34
         multiDexEnabled true
 
         versionCode flutter.versionCode
         versionName flutter.versionName
     }
+
 
 
     // ─── Signing configs ──────────────────────────────────────────────────────
