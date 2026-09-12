@@ -1,16 +1,37 @@
 import React, { useState, useEffect } from 'react';
 import { api } from '../services/api';
 import { exportSingleScanPdf } from '../services/pdfExport';
+import {
+  IconCheck,
+  IconCross,
+  IconAlert,
+  IconInfo,
+  IconArrowLeft,
+  IconDownload,
+  IconChevronUp,
+  IconChevronDown,
+} from '../components/Icons';
 
 function RuleItem({ rule }) {
   const [expanded, setExpanded] = useState(!rule.passed);
   const isInfo = rule.severity === 'info';
-  const icon = isInfo ? 'ℹ️' : rule.passed ? '✅' : '❌';
-  const color = isInfo ? 'var(--blue-light)' : rule.passed ? 'var(--green)' : 'var(--red)';
+  const icon = isInfo ? (
+    <IconInfo size={16} color="#90CAF9" />
+  ) : rule.passed ? (
+    <IconCheck size={16} color="#4ADE80" />
+  ) : (
+    <IconCross size={16} color="#F87171" />
+  );
+
+  const color = isInfo ? '#90CAF9' : rule.passed ? '#4ADE80' : '#F87171';
   const label = isInfo ? 'INFO' : rule.passed ? 'PASS' : 'FAIL';
 
   return (
-    <div className="rule-item" style={{ cursor: 'pointer', borderLeft: `3px solid ${color}` }} onClick={() => setExpanded(e => !e)}>
+    <div
+      className="rule-item"
+      style={{ cursor: 'pointer', borderLeft: `3px solid ${color}` }}
+      onClick={() => setExpanded(e => !e)}
+    >
       <div className="rule-icon">{icon}</div>
       <div style={{ flex: 1 }}>
         <div className="rule-name" style={{ color }}>{rule.rule_name}</div>
@@ -19,7 +40,9 @@ function RuleItem({ rule }) {
           <p className="rule-expl" style={{ marginTop: 6 }}>{rule.explanation}</p>
         )}
       </div>
-      <div style={{ color: 'var(--text-muted)', fontSize: 16 }}>{expanded ? '▲' : '▼'}</div>
+      <div style={{ color: 'var(--text-muted)', display: 'flex', alignItems: 'center' }}>
+        {expanded ? <IconChevronUp size={14} /> : <IconChevronDown size={14} />}
+      </div>
     </div>
   );
 }
@@ -27,12 +50,21 @@ function RuleItem({ rule }) {
 function FieldGrid({ fields }) {
   const nonEmpty = fields.filter(f => f.field_value);
   const names = {
-    manufacturer_name: 'Manufacturer', manufacturer_address: 'Address',
-    generic_name: 'Generic Name', net_quantity_value: 'Net Qty',
-    net_quantity_unit: 'Unit', mrp: 'MRP (₹)',
-    manufacture_month: 'Mfg Month', manufacture_year: 'Mfg Year',
+    manufacturer_name: 'Manufacturer',
+    manufacturer_address: 'Address',
+    generic_name: 'Generic Name',
+    net_quantity_value: 'Net Qty',
+    net_quantity_unit: 'Unit',
+    mrp: 'MRP (₹)',
+    manufacture_month: 'Mfg Month',
+    manufacture_year: 'Mfg Year',
     measured_font_height_mm: 'Font Height (mm)',
+    fssai_license: 'FSSAI License',
+    consumer_care: 'Consumer Care',
+    batch_number: 'Batch Number',
+    expiry_date: 'Expiry / Best Before',
   };
+
   return (
     <div className="fields-grid">
       {nonEmpty.map(f => (
@@ -45,7 +77,7 @@ function FieldGrid({ fields }) {
   );
 }
 
-export default function ScanDetail({ scanId, onBack }) {
+export default function ScanDetail({ scanId, onBack, user }) {
   const [scan, setScan] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
@@ -57,24 +89,41 @@ export default function ScanDetail({ scanId, onBack }) {
       .finally(() => setLoading(false));
   }, [scanId]);
 
-  if (loading) return (
-    <div className="page">
-      <button className="btn btn-outline" style={{ marginBottom: 20 }} onClick={onBack}>← Back</button>
-      <div className="loading-center"><div className="spinner" /></div>
-    </div>
-  );
+  if (loading) {
+    return (
+      <div className="page">
+        <button className="btn btn-outline" style={{ marginBottom: 20 }} onClick={onBack}>
+          <IconArrowLeft size={14} /> Back
+        </button>
+        <div className="loading-center"><div className="spinner" /></div>
+      </div>
+    );
+  }
 
-  if (error) return (
-    <div className="page">
-      <button className="btn btn-outline" style={{ marginBottom: 20 }} onClick={onBack}>← Back</button>
-      <div className="empty-state"><div className="empty-icon">⚠️</div><p>{error}</p></div>
-    </div>
-  );
+  if (error) {
+    return (
+      <div className="page">
+        <button className="btn btn-outline" style={{ marginBottom: 20 }} onClick={onBack}>
+          <IconArrowLeft size={14} /> Back
+        </button>
+        <div className="empty-state">
+          <div className="empty-icon"><IconAlert size={36} color="#F87171" /></div>
+          <p>{error}</p>
+        </div>
+      </div>
+    );
+  }
 
   const v = scan?.verdict || 'UNKNOWN';
-  const verdictEmoji = { COMPLIANT: '✅', NON_COMPLIANT: '❌', NEEDS_REVIEW: '⚠️', UNKNOWN: '❓' };
-  const verdictColor = { COMPLIANT: 'var(--green)', NON_COMPLIANT: 'var(--red)', NEEDS_REVIEW: 'var(--amber)', UNKNOWN: 'var(--text-muted)' };
+  const verdictIcon = v === 'COMPLIANT' ? (
+    <IconCheck size={36} color="#4ADE80" />
+  ) : v === 'NON_COMPLIANT' ? (
+    <IconCross size={36} color="#F87171" />
+  ) : (
+    <IconAlert size={36} color="#FBBF24" />
+  );
 
+  const verdictColor = v === 'COMPLIANT' ? '#4ADE80' : v === 'NON_COMPLIANT' ? '#F87171' : '#FBBF24';
   const passCount = (scan.rule_results || []).filter(r => r.passed).length;
   const totalCount = (scan.rule_results || []).length;
   const formatDate = (d) => d ? new Date(d).toLocaleString('en-IN', { dateStyle: 'long', timeStyle: 'short' }) : '—';
@@ -82,37 +131,42 @@ export default function ScanDetail({ scanId, onBack }) {
   return (
     <div className="page">
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 }}>
-        <button id="back-btn" className="btn btn-outline" onClick={onBack}>← Back to Dashboard</button>
+        <button id="back-btn" className="btn btn-outline" onClick={onBack}>
+          <IconArrowLeft size={14} /> Back to Dashboard
+        </button>
         <button
           id="export-scan-pdf-btn"
           className="btn btn-export"
           onClick={() => exportSingleScanPdf(scan, user)}
           title="Export single scan audit certificate as PDF"
         >
-          📄 Export PDF Report
+          <IconDownload size={14} /> Export PDF Report
         </button>
       </div>
 
       <div className="detail-panel">
         <div className="detail-header">
-          <div className={`verdict-circle ${v}`}>{verdictEmoji[v]}</div>
+          <div className={`verdict-circle ${v}`}>
+            {verdictIcon}
+          </div>
           <div>
-            <h2 style={{ color: verdictColor[v], marginBottom: 4 }}>{v.replace('_', ' ')}</h2>
+            <h2 style={{ color: verdictColor, marginBottom: 4 }}>{v.replace('_', ' ')}</h2>
             <p style={{ color: 'var(--text-muted)', fontSize: 13 }}>
               Scan ID: <code>{scan.id?.substring(0, 8).toUpperCase()}</code>
             </p>
             <p style={{ color: 'var(--text-muted)', fontSize: 13 }}>{formatDate(scan.created_at)}</p>
             <p style={{ marginTop: 6, fontSize: 13 }}>
-              <span style={{ color: 'var(--green)' }}>{passCount} rules passed</span>
+              <span style={{ color: '#4ADE80', fontWeight: 600 }}>{passCount} rules passed</span>
               {' / '}
-              <span style={{ color: 'var(--red)' }}>{totalCount - passCount} failed</span>
+              <span style={{ color: '#F87171', fontWeight: 600 }}>{totalCount - passCount} failed</span>
             </p>
           </div>
         </div>
 
         {scan.needs_manual_review && (
-          <div style={{ background: 'rgba(245,158,11,0.1)', border: '1px solid rgba(245,158,11,0.3)', borderRadius: 8, padding: '12px 16px', marginBottom: 20, fontSize: 13, color: 'var(--amber)' }}>
-            ⚠ Manual Review Required — {scan.review_reason}
+          <div style={{ background: 'rgba(217,119,6,0.12)', border: '1px solid rgba(217,119,6,0.35)', borderRadius: 8, padding: '12px 16px', marginBottom: 20, fontSize: 13, color: '#FBBF24', display: 'flex', alignItems: 'center', gap: 10 }}>
+            <IconAlert size={18} color="#FBBF24" />
+            <span><strong>Manual Review Required:</strong> {scan.review_reason}</span>
           </div>
         )}
 
@@ -124,7 +178,9 @@ export default function ScanDetail({ scanId, onBack }) {
           </div>
           <div className="field-card">
             <div className="field-label">Language</div>
-            <div className="field-value" style={{ textTransform: 'uppercase' }}>{scan.detected_language || 'en'}</div>
+            <div className="field-value" style={{ textTransform: 'uppercase', color: 'var(--brand-teal-light)' }}>
+              {scan.detected_language || 'en'}
+            </div>
           </div>
           <div className="field-card">
             <div className="field-label">Image</div>
@@ -145,10 +201,10 @@ export default function ScanDetail({ scanId, onBack }) {
         </div>
 
         {/* Extracted fields */}
-        {scan.extracted_fields?.length > 0 && (
+        {(scan.extracted_fields || scan.fields)?.length > 0 && (
           <>
             <h3 style={{ marginTop: 28, marginBottom: 4 }}>Extracted Label Fields</h3>
-            <FieldGrid fields={scan.extracted_fields} />
+            <FieldGrid fields={scan.extracted_fields || scan.fields} />
           </>
         )}
       </div>

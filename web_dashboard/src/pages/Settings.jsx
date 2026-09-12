@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { api } from '../services/api';
+import { IconCheck } from '../components/Icons';
 
 export default function Settings({ user }) {
   const [health, setHealth] = useState(null);
@@ -22,22 +23,25 @@ export default function Settings({ user }) {
   }
 
   return (
-    <div className="settings-page" style={{ padding: '24px' }}>
+    <div className="settings-page" style={{ padding: '28px 36px' }}>
       <div className="page-header" style={{ marginBottom: 24 }}>
-        <h1 style={{ fontSize: '1.75rem', fontWeight: 800 }}>System & Enforcement Settings</h1>
-        <p style={{ color: 'var(--text-muted)' }}>Configure Legal Metrology PCR 2011 rule parameters and view service health</p>
+        <h1 style={{ fontSize: '1.85rem', fontWeight: 800, letterSpacing: -0.5 }}>System & Enforcement Settings</h1>
+        <p style={{ color: 'var(--text-secondary)', fontSize: 13.5, marginTop: 4 }}>
+          Configure Legal Metrology PCR 2011 rule parameters and view live infrastructure health
+        </p>
       </div>
 
       {savedMsg && (
-        <div style={{ padding: 12, borderRadius: 8, background: 'rgba(16,185,129,0.15)', border: '1px solid #10B981', color: '#10B981', marginBottom: 20 }}>
-          {savedMsg}
+        <div style={{ padding: 12, borderRadius: 8, background: 'var(--status-pass-bg)', border: '1px solid var(--status-pass-border)', color: '#4ADE80', marginBottom: 20, fontSize: 13.5, display: 'flex', alignItems: 'center', gap: 8 }}>
+          <IconCheck size={16} color="#4ADE80" />
+          <span>{savedMsg}</span>
         </div>
       )}
 
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(320px, 1fr))', gap: 24 }}>
         {/* Rule Parameters */}
-        <div style={{ background: 'var(--bg-card)', padding: 24, borderRadius: 12, border: '1px solid var(--border)' }}>
-          <h3 style={{ fontSize: '1.2rem', fontWeight: 700, marginBottom: 16 }}>Rules Engine Thresholds</h3>
+        <div style={{ background: 'var(--bg-card)', padding: 24, borderRadius: 14, border: '1px solid var(--border)', boxShadow: 'var(--shadow-sm)' }}>
+          <h3 style={{ fontSize: '1.15rem', fontWeight: 700, marginBottom: 16 }}>Rules Engine Thresholds</h3>
           
           <form onSubmit={handleSave} style={{ display: 'flex', flexDirection: 'column', gap: 18 }}>
             <div>
@@ -51,7 +55,7 @@ export default function Settings({ user }) {
                 step="0.05"
                 value={ocrThreshold}
                 onChange={e => setOcrThreshold(parseFloat(e.target.value))}
-                style={{ width: '100%' }}
+                style={{ width: '100%', accentColor: 'var(--brand-primary)' }}
               />
               <div style={{ fontSize: 12, color: 'var(--text-muted)', marginTop: 4 }}>
                 Scans below this score are automatically flagged as NEEDS_REVIEW
@@ -69,7 +73,7 @@ export default function Settings({ user }) {
                 max="6.0"
                 value={minFontHeight}
                 onChange={e => setMinFontHeight(parseFloat(e.target.value))}
-                style={{ width: '100%', padding: '10px 12px', borderRadius: 8, background: '#0F172A', border: '1px solid var(--border)', color: '#fff' }}
+                className="form-input"
               />
               <div style={{ fontSize: 12, color: 'var(--text-muted)', marginTop: 4 }}>
                 Minimum numeral height enforced according to declared weight/volume
@@ -80,7 +84,7 @@ export default function Settings({ user }) {
               <label style={{ display: 'block', fontSize: 13, fontWeight: 600, marginBottom: 6 }}>
                 Date Format Strictness (Rule 7)
               </label>
-              <select style={{ width: '100%', padding: '10px 12px', borderRadius: 8, background: '#0F172A', border: '1px solid var(--border)', color: '#fff' }}>
+              <select className="filter-select" style={{ width: '100%' }}>
                 <option value="strict">Strict (DD/MM/YYYY or MM/YYYY required)</option>
                 <option value="flexible">Flexible (Allow Month Name, e.g. JAN 2026)</option>
               </select>
@@ -88,7 +92,8 @@ export default function Settings({ user }) {
 
             <button
               type="submit"
-              style={{ background: '#3B82F6', color: '#fff', padding: '10px 18px', borderRadius: 8, border: 'none', fontWeight: 600, cursor: 'pointer', alignSelf: 'flex-start', marginTop: 8 }}
+              className="btn btn-primary"
+              style={{ alignSelf: 'flex-start', marginTop: 4 }}
             >
               Save Parameters
             </button>
@@ -96,33 +101,47 @@ export default function Settings({ user }) {
         </div>
 
         {/* Live Service Health */}
-        <div style={{ background: 'var(--bg-card)', padding: 24, borderRadius: 12, border: '1px solid var(--border)' }}>
-          <h3 style={{ fontSize: '1.2rem', fontWeight: 700, marginBottom: 16 }}>Live System & Environment Health</h3>
+        <div style={{ background: 'var(--bg-card)', padding: 24, borderRadius: 14, border: '1px solid var(--border)', boxShadow: 'var(--shadow-sm)' }}>
+          <h3 style={{ fontSize: '1.15rem', fontWeight: 700, marginBottom: 16 }}>Live System & Environment Health</h3>
           
           <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
-            <div style={{ padding: 14, borderRadius: 8, background: 'rgba(255,255,255,0.03)', border: '1px solid var(--border)' }}>
-              <div style={{ fontSize: 12, color: 'var(--text-muted)' }}>BACKEND SERVICE</div>
-              <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 4, fontWeight: 600 }}>
-                <span style={{ color: health?.status === 'ok' ? '#10B981' : '#EF4444' }}>
-                  ● {health?.status === 'ok' ? 'Online (Render Hosted)' : 'Connecting / Degraded'}
+            <div style={{ padding: 14, borderRadius: 8, background: 'var(--bg-2)', border: '1px solid var(--border)' }}>
+              <div style={{ fontSize: 11.5, color: 'var(--text-muted)', fontWeight: 600, textTransform: 'uppercase', letterSpacing: 0.5 }}>BACKEND SERVICE</div>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 6, fontWeight: 600 }}>
+                <span style={{
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: 6,
+                  color: health?.status === 'ok' ? '#4ADE80' : '#F87171',
+                  fontSize: 13.5
+                }}>
+                  <span style={{ width: 7, height: 7, borderRadius: '50%', background: health?.status === 'ok' ? '#4ADE80' : '#F87171' }} />
+                  {health?.status === 'ok' ? 'Online (Render Hosted)' : 'Connecting / Degraded'}
                 </span>
               </div>
-              <div style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 4 }}>https://labelsure-jw0d.onrender.com</div>
+              <div style={{ fontSize: 12, color: 'var(--text-muted)', marginTop: 4, fontFamily: 'monospace' }}>https://labelsure-jw0d.onrender.com</div>
             </div>
 
-            <div style={{ padding: 14, borderRadius: 8, background: 'rgba(255,255,255,0.03)', border: '1px solid var(--border)' }}>
-              <div style={{ fontSize: 12, color: 'var(--text-muted)' }}>DATABASE ENGINE</div>
-              <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 4, fontWeight: 600 }}>
-                <span style={{ color: health?.db === 'ok' ? '#10B981' : '#EF4444' }}>
-                  ● {health?.db === 'ok' ? 'Neon Serverless PostgreSQL' : 'Connecting...'}
+            <div style={{ padding: 14, borderRadius: 8, background: 'var(--bg-2)', border: '1px solid var(--border)' }}>
+              <div style={{ fontSize: 11.5, color: 'var(--text-muted)', fontWeight: 600, textTransform: 'uppercase', letterSpacing: 0.5 }}>DATABASE ENGINE</div>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 6, fontWeight: 600 }}>
+                <span style={{
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: 6,
+                  color: health?.db === 'ok' ? '#4ADE80' : '#F87171',
+                  fontSize: 13.5
+                }}>
+                  <span style={{ width: 7, height: 7, borderRadius: '50%', background: health?.db === 'ok' ? '#4ADE80' : '#F87171' }} />
+                  {health?.db === 'ok' ? 'Neon Serverless PostgreSQL' : 'Connecting...'}
                 </span>
               </div>
             </div>
 
-            <div style={{ padding: 14, borderRadius: 8, background: 'rgba(255,255,255,0.03)', border: '1px solid var(--border)' }}>
-              <div style={{ fontSize: 12, color: 'var(--text-muted)' }}>LOGGED-IN OFFICER PROFILE</div>
-              <div style={{ fontWeight: 600, marginTop: 4 }}>{user?.full_name || user?.email}</div>
-              <div style={{ fontSize: 12, color: '#60A5FA', marginTop: 2 }}>Role: {user?.role} | Region: {user?.region || 'National'}</div>
+            <div style={{ padding: 14, borderRadius: 8, background: 'var(--bg-2)', border: '1px solid var(--border)' }}>
+              <div style={{ fontSize: 11.5, color: 'var(--text-muted)', fontWeight: 600, textTransform: 'uppercase', letterSpacing: 0.5 }}>LOGGED-IN OFFICER PROFILE</div>
+              <div style={{ fontWeight: 600, marginTop: 6, color: 'var(--text-primary)' }}>{user?.full_name || user?.email}</div>
+              <div style={{ fontSize: 12, color: 'var(--brand-teal-light)', marginTop: 2, fontWeight: 500 }}>Role: {user?.role} | Region: {user?.region || 'National'}</div>
             </div>
           </div>
         </div>

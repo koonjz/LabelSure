@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { api } from '../services/api';
+import { IconPlus, IconCheck, IconCross } from '../components/Icons';
 
 export default function Users() {
   const [users, setUsers] = useState([]);
@@ -43,31 +44,34 @@ export default function Users() {
   }
 
   return (
-    <div className="users-page" style={{ padding: '24px' }}>
+    <div className="users-page" style={{ padding: '28px 36px' }}>
       <div className="page-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 24 }}>
         <div>
-          <h1 style={{ fontSize: '1.75rem', fontWeight: 800 }}>User & Officer Management</h1>
-          <p style={{ color: 'var(--text-muted)' }}>Registered enforcement officers, inspectors, and seller accounts</p>
+          <h1 style={{ fontSize: '1.85rem', fontWeight: 800, letterSpacing: -0.5 }}>User & Officer Management</h1>
+          <p style={{ color: 'var(--text-secondary)', fontSize: 13.5, marginTop: 4 }}>
+            Registered enforcement officers, inspectors, and system accounts
+          </p>
         </div>
         <button
-          className="action-btn primary"
+          className="btn btn-primary"
           onClick={() => setShowModal(true)}
-          style={{ background: '#3B82F6', color: '#fff', padding: '10px 18px', borderRadius: 8, border: 'none', fontWeight: 600, cursor: 'pointer' }}
+          style={{ padding: '9px 18px' }}
         >
-          + Add New Officer / User
+          <IconPlus size={15} /> Add Officer / User
         </button>
       </div>
 
       {formSuccess && (
-        <div style={{ padding: 12, borderRadius: 8, background: 'rgba(16,185,129,0.15)', border: '1px solid #10B981', color: '#10B981', marginBottom: 16 }}>
-          {formSuccess}
+        <div style={{ padding: 12, borderRadius: 8, background: 'var(--status-pass-bg)', border: '1px solid var(--status-pass-border)', color: '#4ADE80', marginBottom: 16, fontSize: 13.5, display: 'flex', alignItems: 'center', gap: 8 }}>
+          <IconCheck size={16} color="#4ADE80" />
+          <span>{formSuccess}</span>
         </div>
       )}
 
-      <div style={{ background: 'var(--bg-card)', borderRadius: 12, border: '1px solid var(--border)', overflow: 'hidden' }}>
+      <div style={{ background: 'var(--bg-card)', borderRadius: 14, border: '1px solid var(--border)', overflow: 'hidden', boxShadow: 'var(--shadow)' }}>
         <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left' }}>
           <thead>
-            <tr style={{ background: 'rgba(255,255,255,0.03)', borderBottom: '1px solid var(--border)', color: 'var(--text-muted)', fontSize: 12, textTransform: 'uppercase' }}>
+            <tr style={{ background: 'var(--bg-2)', borderBottom: '1px solid var(--border)', color: 'var(--text-muted)', fontSize: 11, fontWeight: 700, textTransform: 'uppercase', letterSpacing: 0.6 }}>
               <th style={{ padding: '14px 20px' }}>Name & Email</th>
               <th style={{ padding: '14px 20px' }}>Role</th>
               <th style={{ padding: '14px 20px' }}>Region / Jurisdiction</th>
@@ -78,41 +82,55 @@ export default function Users() {
           <tbody>
             {loading ? (
               <tr>
-                <td colSpan={5} style={{ padding: 32, textAlign: 'center', color: 'var(--text-muted)' }}>Loading user accounts...</td>
+                <td colSpan={5} style={{ padding: 40, textAlign: 'center', color: 'var(--text-muted)' }}>
+                  <div className="spinner" style={{ margin: '0 auto 12px' }} />
+                  Loading user accounts...
+                </td>
               </tr>
             ) : users.length === 0 ? (
               <tr>
-                <td colSpan={5} style={{ padding: 32, textAlign: 'center', color: 'var(--text-muted)' }}>No user accounts found</td>
+                <td colSpan={5} style={{ padding: 40, textAlign: 'center', color: 'var(--text-muted)' }}>No user accounts found</td>
               </tr>
             ) : (
               users.map(u => (
                 <tr key={u.id} style={{ borderBottom: '1px solid var(--border)' }}>
-                  <td style={{ padding: '16px 20px' }}>
-                    <div style={{ fontWeight: 600 }}>{u.full_name || 'N/A'}</div>
-                    <div style={{ fontSize: 13, color: 'var(--text-muted)' }}>{u.email}</div>
+                  <td style={{ padding: '14px 20px' }}>
+                    <div style={{ fontWeight: 600, color: 'var(--text-primary)' }}>{u.full_name || 'N/A'}</div>
+                    <div style={{ fontSize: 12.5, color: 'var(--text-muted)' }}>{u.email}</div>
                   </td>
-                  <td style={{ padding: '16px 20px' }}>
+                  <td style={{ padding: '14px 20px' }}>
                     <span style={{
-                      padding: '4px 10px',
+                      padding: '3px 10px',
                       borderRadius: 20,
-                      fontSize: 12,
+                      fontSize: 11.5,
                       fontWeight: 700,
                       textTransform: 'uppercase',
-                      background: u.role === 'officer' || u.role === 'admin' ? 'rgba(59,130,246,0.15)' : 'rgba(255,255,255,0.1)',
-                      color: u.role === 'officer' || u.role === 'admin' ? '#60A5FA' : '#9CA3AF',
-                      border: u.role === 'officer' || u.role === 'admin' ? '1px solid rgba(59,130,246,0.3)' : '1px solid rgba(255,255,255,0.1)',
+                      letterSpacing: 0.4,
+                      background: u.role === 'admin' ? 'rgba(21,101,192,0.18)' : 'rgba(0,137,123,0.18)',
+                      color: u.role === 'admin' ? '#90CAF9' : '#80CBC4',
+                      border: u.role === 'admin' ? '1px solid rgba(21,101,192,0.35)' : '1px solid rgba(0,137,123,0.35)',
                     }}>
                       {u.role}
                     </span>
                   </td>
-                  <td style={{ padding: '16px 20px', fontSize: 14 }}>{u.region || 'National HQ'}</td>
-                  <td style={{ padding: '16px 20px' }}>
-                    <span style={{ color: u.is_active ? '#10B981' : '#EF4444', fontSize: 13, fontWeight: 600 }}>
-                      ● {u.is_active ? 'Active' : 'Disabled'}
+                  <td style={{ padding: '14px 20px', fontSize: 13.5, color: 'var(--text-secondary)' }}>
+                    {u.region || 'National HQ'}
+                  </td>
+                  <td style={{ padding: '14px 20px' }}>
+                    <span style={{
+                      display: 'inline-flex',
+                      alignItems: 'center',
+                      gap: 6,
+                      fontSize: 12.5,
+                      fontWeight: 600,
+                      color: u.is_active ? '#4ADE80' : '#F87171',
+                    }}>
+                      <span style={{ width: 6, height: 6, borderRadius: '50%', background: u.is_active ? '#4ADE80' : '#F87171' }} />
+                      {u.is_active ? 'Active' : 'Disabled'}
                     </span>
                   </td>
-                  <td style={{ padding: '16px 20px', fontSize: 13, color: 'var(--text-muted)' }}>
-                    {u.created_at ? new Date(u.created_at).toLocaleDateString() : 'N/A'}
+                  <td style={{ padding: '14px 20px', fontSize: 12.5, color: 'var(--text-muted)' }}>
+                    {u.created_at ? new Date(u.created_at).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' }) : 'N/A'}
                   </td>
                 </tr>
               ))
@@ -122,86 +140,90 @@ export default function Users() {
       </div>
 
       {showModal && (
-        <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.7)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000, padding: 16 }}>
-          <div style={{ background: '#1E293B', padding: 28, borderRadius: 16, width: '100%', maxWidth: 460, border: '1px solid var(--border)' }}>
-            <h2 style={{ fontSize: '1.3rem', fontWeight: 700, marginBottom: 16 }}>Register Officer / User</h2>
-            {formError && <div style={{ padding: 10, borderRadius: 6, background: 'rgba(239,68,68,0.2)', border: '1px solid #EF4444', color: '#EF4444', marginBottom: 14, fontSize: 13 }}>{formError}</div>}
+        <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.75)', backdropFilter: 'blur(4px)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000, padding: 16 }}>
+          <div style={{ background: 'var(--bg-card)', padding: 28, borderRadius: 16, width: '100%', maxWidth: 440, border: '1px solid var(--border)', boxShadow: 'var(--shadow)' }}>
+            <h2 style={{ fontSize: '1.25rem', fontWeight: 700, marginBottom: 16 }}>Register Officer / User</h2>
+            {formError && (
+              <div style={{ padding: 10, borderRadius: 6, background: 'var(--status-fail-bg)', border: '1px solid var(--status-fail-border)', color: '#F87171', marginBottom: 14, fontSize: 13 }}>
+                {formError}
+              </div>
+            )}
             
             <form onSubmit={handleRegister} style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
               <div>
-                <label style={{ display: 'block', fontSize: 13, color: 'var(--text-muted)', marginBottom: 4 }}>Full Name</label>
+                <label style={{ display: 'block', fontSize: 12.5, fontWeight: 600, color: 'var(--text-secondary)', marginBottom: 4 }}>Full Name</label>
                 <input
                   type="text"
                   required
                   value={formData.full_name}
                   onChange={e => setFormData({ ...formData, full_name: e.target.value })}
                   placeholder="Officer R. K. Singh"
-                  style={{ width: '100%', padding: '10px 12px', borderRadius: 8, background: '#0F172A', border: '1px solid var(--border)', color: '#fff' }}
+                  className="form-input"
                 />
               </div>
 
               <div>
-                <label style={{ display: 'block', fontSize: 13, color: 'var(--text-muted)', marginBottom: 4 }}>Official Email</label>
+                <label style={{ display: 'block', fontSize: 12.5, fontWeight: 600, color: 'var(--text-secondary)', marginBottom: 4 }}>Official Email</label>
                 <input
                   type="email"
                   required
                   value={formData.email}
                   onChange={e => setFormData({ ...formData, email: e.target.value })}
                   placeholder="officer.singh@labelsure.gov.in"
-                  style={{ width: '100%', padding: '10px 12px', borderRadius: 8, background: '#0F172A', border: '1px solid var(--border)', color: '#fff' }}
+                  className="form-input"
                 />
               </div>
 
               <div>
-                <label style={{ display: 'block', fontSize: 13, color: 'var(--text-muted)', marginBottom: 4 }}>Password</label>
+                <label style={{ display: 'block', fontSize: 12.5, fontWeight: 600, color: 'var(--text-secondary)', marginBottom: 4 }}>Password</label>
                 <input
                   type="password"
                   required
                   value={formData.password}
                   onChange={e => setFormData({ ...formData, password: e.target.value })}
-                  placeholder="At least 6 characters"
-                  style={{ width: '100%', padding: '10px 12px', borderRadius: 8, background: '#0F172A', border: '1px solid var(--border)', color: '#fff' }}
+                  placeholder="Minimum 6 characters"
+                  className="form-input"
                 />
               </div>
 
               <div>
-                <label style={{ display: 'block', fontSize: 13, color: 'var(--text-muted)', marginBottom: 4 }}>Role</label>
+                <label style={{ display: 'block', fontSize: 12.5, fontWeight: 600, color: 'var(--text-secondary)', marginBottom: 4 }}>Role</label>
                 <select
                   value={formData.role}
                   onChange={e => setFormData({ ...formData, role: e.target.value })}
-                  style={{ width: '100%', padding: '10px 12px', borderRadius: 8, background: '#0F172A', border: '1px solid var(--border)', color: '#fff' }}
+                  className="filter-select"
+                  style={{ width: '100%' }}
                 >
                   <option value="officer">Enforcement Officer</option>
                   <option value="admin">Administrator</option>
-                  <option value="seller">Manufacturer / Seller</option>
-                  <option value="consumer">Consumer Auditor</option>
+                  <option value="consumer">Auditor / Consumer</option>
                 </select>
               </div>
 
               <div>
-                <label style={{ display: 'block', fontSize: 13, color: 'var(--text-muted)', marginBottom: 4 }}>Region / Zone</label>
+                <label style={{ display: 'block', fontSize: 12.5, fontWeight: 600, color: 'var(--text-secondary)', marginBottom: 4 }}>Region / Zone</label>
                 <input
                   type="text"
                   value={formData.region}
                   onChange={e => setFormData({ ...formData, region: e.target.value })}
-                  placeholder="e.g. North Zone / Delhi"
-                  style={{ width: '100%', padding: '10px 12px', borderRadius: 8, background: '#0F172A', border: '1px solid var(--border)', color: '#fff' }}
+                  placeholder="e.g. North Zone / Delhi Wing"
+                  className="form-input"
                 />
               </div>
 
-              <div style={{ display: 'flex', gap: 12, justifyContent: 'flex-end', marginTop: 12 }}>
+              <div style={{ display: 'flex', gap: 10, marginTop: 8, justifyContent: 'flex-end' }}>
                 <button
                   type="button"
+                  className="btn btn-outline"
                   onClick={() => setShowModal(false)}
-                  style={{ padding: '10px 16px', borderRadius: 8, background: 'transparent', border: '1px solid var(--border)', color: '#fff', cursor: 'pointer' }}
                 >
                   Cancel
                 </button>
                 <button
                   type="submit"
-                  style={{ padding: '10px 18px', borderRadius: 8, background: '#3B82F6', border: 'none', color: '#fff', fontWeight: 600, cursor: 'pointer' }}
+                  className="btn btn-primary"
                 >
-                  Save User
+                  Create Account
                 </button>
               </div>
             </form>

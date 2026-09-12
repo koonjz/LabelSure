@@ -2,23 +2,52 @@ import React, { useState, useEffect } from 'react';
 import { api } from '../services/api';
 import { exportCompliancePdf } from '../services/pdfExport';
 import ScanDetail from './ScanDetail';
+import {
+  IconCheck,
+  IconCross,
+  IconAlert,
+  IconRefresh,
+  IconDownload,
+  IconSearch,
+  IconLayers,
+} from '../components/Icons';
 
 const VERDICTS = ['COMPLIANT', 'NON_COMPLIANT', 'NEEDS_REVIEW'];
 
 function VerdictBadge({ verdict }) {
   const v = verdict || 'UNKNOWN';
-  const labels = { COMPLIANT: '✓ Compliant', NON_COMPLIANT: '✗ Non-Compliant', NEEDS_REVIEW: '⚠ Needs Review', UNKNOWN: '? Unknown' };
-  return <span className={`verdict-badge ${v}`}>{labels[v] || v}</span>;
+  if (v === 'COMPLIANT') {
+    return (
+      <span className="verdict-badge COMPLIANT">
+        <IconCheck size={12} color="#4ADE80" /> Compliant
+      </span>
+    );
+  }
+  if (v === 'NON_COMPLIANT') {
+    return (
+      <span className="verdict-badge NON_COMPLIANT">
+        <IconCross size={12} color="#F87171" /> Non-Compliant
+      </span>
+    );
+  }
+  if (v === 'NEEDS_REVIEW') {
+    return (
+      <span className="verdict-badge NEEDS_REVIEW">
+        <IconAlert size={12} color="#FBBF24" /> Needs Review
+      </span>
+    );
+  }
+  return <span className="verdict-badge UNKNOWN">{v}</span>;
 }
 
 function ConfidenceBar({ value }) {
   if (value == null) return <span style={{ color: 'var(--text-muted)' }}>—</span>;
   const pct = Math.round(value * 100);
-  const color = pct >= 85 ? 'var(--green)' : pct >= 70 ? 'var(--amber)' : 'var(--red)';
+  const color = pct >= 85 ? '#4ADE80' : pct >= 70 ? '#FBBF24' : '#F87171';
   return (
     <div className="conf-bar-wrap">
       <div className="conf-bar"><div className="conf-bar-fill" style={{ width: `${pct}%`, background: color }} /></div>
-      <span style={{ fontSize: 12, color }}>{pct}%</span>
+      <span style={{ fontSize: 12, color, fontWeight: 600 }}>{pct}%</span>
     </div>
   );
 }
@@ -129,10 +158,10 @@ export default function Dashboard({ user }) {
 
       {/* Stats */}
       <div className="stats-grid">
-        <StatCard label="Total Scans" value={total} color="blue" icon="📊" />
-        <StatCard label="Compliant" value={compliantCount} color="green" icon="✅" />
-        <StatCard label="Non-Compliant" value={nonCompliantCount} color="red" icon="❌" />
-        <StatCard label="Needs Review" value={reviewCount} color="amber" icon="⚠️" />
+        <StatCard label="Total Scans" value={total} color="blue" icon={<IconLayers size={22} color="#90CAF9" />} />
+        <StatCard label="Compliant" value={compliantCount} color="green" icon={<IconCheck size={22} color="#4ADE80" />} />
+        <StatCard label="Non-Compliant" value={nonCompliantCount} color="red" icon={<IconCross size={22} color="#F87171" />} />
+        <StatCard label="Needs Review" value={reviewCount} color="amber" icon={<IconAlert size={22} color="#FBBF24" />} />
       </div>
 
       {/* Filters */}
@@ -155,7 +184,9 @@ export default function Dashboard({ user }) {
             <option key={v} value={v}>{v.replace('_', ' ')}</option>
           ))}
         </select>
-        <button id="refresh-btn" className="btn btn-outline" onClick={() => load()}>⟳ Refresh</button>
+        <button id="refresh-btn" className="btn btn-outline" onClick={() => load()}>
+          <IconRefresh size={14} /> Refresh
+        </button>
         <button
           id="export-pdf-btn"
           className="btn btn-export"
@@ -163,7 +194,7 @@ export default function Dashboard({ user }) {
           disabled={exporting || loading || filtered.length === 0}
           title="Export complete compliance report as PDF"
         >
-          {exporting ? '⏳ Generating PDF...' : '📄 Export PDF'}
+          <IconDownload size={14} /> {exporting ? 'Generating PDF...' : 'Export PDF'}
         </button>
       </div>
 
@@ -174,21 +205,21 @@ export default function Dashboard({ user }) {
             <div className="loading-center"><div className="spinner" /></div>
           ) : error ? (
             <div className="empty-state">
-              <div className="empty-icon">⚠️</div>
+              <div className="empty-icon"><IconAlert size={36} color="#F87171" /></div>
               <p>{error}</p>
-              <button className="btn btn-primary" style={{ marginTop: 12 }} onClick={load}>Retry</button>
+              <button className="btn btn-primary" style={{ marginTop: 14 }} onClick={load}>Retry</button>
             </div>
           ) : filtered.length === 0 ? (
             <div className="empty-state">
-              <div className="empty-icon">🔍</div>
-              <p>No scans found</p>
+              <div className="empty-icon"><IconSearch size={36} color="#64748B" /></div>
+              <p>No scans found matching current criteria</p>
             </div>
           ) : (
             <table>
               <thead>
                 <tr>
                   <th>Scan ID</th>
-                  <th>File</th>
+                  <th>File / Product</th>
                   <th>Verdict</th>
                   <th>OCR Confidence</th>
                   <th>Language</th>
@@ -201,10 +232,10 @@ export default function Dashboard({ user }) {
                     <td style={{ fontFamily: 'monospace', fontSize: 12, color: 'var(--text-muted)' }}>
                       {scan.id?.substring(0, 8).toUpperCase()}
                     </td>
-                    <td>{scan.image_filename || '—'}</td>
+                    <td style={{ fontWeight: 500 }}>{scan.image_filename || '—'}</td>
                     <td><VerdictBadge verdict={scan.verdict} /></td>
                     <td><ConfidenceBar value={scan.overall_confidence} /></td>
-                    <td style={{ textTransform: 'uppercase', fontSize: 12, color: 'var(--blue-light)' }}>
+                    <td style={{ textTransform: 'uppercase', fontSize: 12, color: 'var(--brand-teal-light)', fontWeight: 600 }}>
                       {scan.detected_language || 'en'}
                     </td>
                     <td style={{ color: 'var(--text-muted)', fontSize: 12 }}>
@@ -216,6 +247,7 @@ export default function Dashboard({ user }) {
             </table>
           )}
         </div>
+
         {/* Pagination */}
         {!loading && totalPages > 1 && (
           <div className="pagination">

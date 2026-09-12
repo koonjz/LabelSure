@@ -5,51 +5,47 @@ import Dashboard from './pages/Dashboard';
 import Analytics from './pages/Analytics';
 import Users from './pages/Users';
 import Settings from './pages/Settings';
+import {
+  IconDashboard,
+  IconAnalytics,
+  IconUsers,
+  IconSettings,
+  IconLogo,
+} from './components/Icons';
 
 function Sidebar({ user, activeTab, onTabChange, onLogout }) {
   const navItems = [
-    { id: 'dashboard', label: 'Dashboard', icon: '📊' },
-    { id: 'analytics', label: 'Analytics', icon: '📈' },
-    { id: 'users', label: 'Users', icon: '👥' },
-    { id: 'settings', label: 'Settings', icon: '⚙️' },
+    { id: 'dashboard', label: 'Dashboard', icon: <IconDashboard size={17} /> },
+    { id: 'analytics', label: 'Analytics', icon: <IconAnalytics size={17} /> },
+    { id: 'users', label: 'Users', icon: <IconUsers size={17} /> },
+    { id: 'settings', label: 'Settings', icon: <IconSettings size={17} /> },
   ];
 
   return (
     <div className="sidebar">
       <div className="sidebar-logo">
-        <div className="logo-icon">🔍</div>
+        <div className="logo-icon">
+          <IconLogo size={22} color="#FFFFFF" />
+        </div>
         <div>
           <div className="logo-text">LabelSure</div>
           <div className="logo-sub">Officer Portal</div>
         </div>
       </div>
+
       <nav className="sidebar-nav">
         {navItems.map(item => (
           <button
             key={item.id}
             className={`nav-item ${activeTab === item.id ? 'active' : ''}`}
             onClick={() => onTabChange(item.id)}
-            style={{
-              display: 'flex',
-              alignItems: 'center',
-              gap: 12,
-              width: '100%',
-              padding: '12px 16px',
-              border: 'none',
-              borderRadius: 8,
-              background: activeTab === item.id ? 'rgba(59,130,246,0.15)' : 'transparent',
-              color: activeTab === item.id ? '#60A5FA' : 'var(--text-muted)',
-              fontWeight: activeTab === item.id ? 700 : 500,
-              cursor: 'pointer',
-              marginBottom: 4,
-              textAlign: 'left'
-            }}
           >
             <span className="nav-icon">{item.icon}</span>
             <span>{item.label}</span>
           </button>
         ))}
       </nav>
+
       <div className="sidebar-footer">
         <div className="user-info">
           <div className="user-avatar">
@@ -66,7 +62,7 @@ function Sidebar({ user, activeTab, onTabChange, onLogout }) {
   );
 }
 
-function App() {
+export default function App() {
   const [user, setUser] = useState(null);
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState('dashboard');
@@ -106,15 +102,18 @@ function App() {
 
   return (
     <div className="app-layout">
-      <Sidebar user={user} activeTab={activeTab} onTabChange={setActiveTab} onLogout={handleLogout} />
+      <Sidebar
+        user={user}
+        activeTab={activeTab}
+        onTabChange={setActiveTab}
+        onLogout={handleLogout}
+      />
       <main className="main-content">
         {activeTab === 'dashboard' && <Dashboard user={user} />}
-        {activeTab === 'analytics' && <Analytics />}
-        {activeTab === 'users' && <Users />}
+        {activeTab === 'analytics' && <Analytics user={user} />}
+        {activeTab === 'users' && <Users user={user} />}
         {activeTab === 'settings' && <Settings user={user} />}
       </main>
     </div>
   );
 }
-
-export default App;

@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { api, setToken } from '../services/api';
+import { IconLogo, IconAlert } from '../components/Icons';
 
 export default function Login({ onLogin }) {
   const [email, setEmail] = useState('');
@@ -26,18 +27,20 @@ export default function Login({ onLogin }) {
     <div className="login-page">
       <div className="login-card">
         <div className="login-logo">
-          <div className="logo-icon" style={{ width: 48, height: 48, borderRadius: 14, background: 'linear-gradient(135deg,#3B82F6,#8B5CF6)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 24 }}>
-            🔍
+          <div className="logo-icon" style={{ width: 44, height: 44, borderRadius: 12, background: 'linear-gradient(135deg, var(--brand-primary), var(--brand-teal))', display: 'flex', alignItems: 'center', justifyContent: 'center', boxShadow: '0 2px 12px rgba(21,101,192,0.4)' }}>
+            <IconLogo size={24} color="#FFFFFF" />
           </div>
           <div>
-            <div style={{ fontSize: '1.3rem', fontWeight: 800 }}>LabelSure</div>
-            <div style={{ fontSize: 11, color: 'var(--text-muted)', letterSpacing: 1 }}>OFFICER DASHBOARD</div>
+            <div style={{ fontSize: '1.3rem', fontWeight: 800, letterSpacing: -0.3 }}>LabelSure</div>
+            <div style={{ fontSize: 10.5, color: 'var(--brand-teal-light)', fontWeight: 700, letterSpacing: 0.8, textTransform: 'uppercase' }}>OFFICER DASHBOARD</div>
           </div>
         </div>
-        <h2>Sign In</h2>
+
+        <h2 style={{ fontSize: '1.35rem', fontWeight: 700, marginBottom: 20, textAlign: 'center' }}>Sign In</h2>
+
         <form onSubmit={handleSubmit}>
           <div className="form-group">
-            <label className="form-label">Email</label>
+            <label className="form-label">Official Email</label>
             <input
               id="login-email"
               className="form-input"
@@ -46,9 +49,10 @@ export default function Login({ onLogin }) {
               onChange={e => setEmail(e.target.value)}
               required
               autoComplete="email"
-              placeholder="officer@dept.gov.in"
+              placeholder="officer@labelsure.gov.in"
             />
           </div>
+
           <div className="form-group">
             <label className="form-label">Password</label>
             <input
@@ -59,21 +63,30 @@ export default function Login({ onLogin }) {
               onChange={e => setPassword(e.target.value)}
               required
               autoComplete="current-password"
+              placeholder="••••••••"
             />
           </div>
-          {error && <div className="form-error" style={{ marginBottom: 12 }}>⚠ {error}</div>}
+
+          {error && (
+            <div className="form-error" style={{ marginBottom: 12, background: 'var(--status-fail-bg)', border: '1px solid var(--status-fail-border)', padding: '8px 12px', borderRadius: 6 }}>
+              <IconAlert size={14} color="#F87171" />
+              <span>{error}</span>
+            </div>
+          )}
+
           <button
             id="login-submit"
             type="submit"
             className="btn btn-primary"
-            style={{ width: '100%', padding: '12px', marginTop: 8, fontSize: 15, justifyContent: 'center' }}
+            style={{ width: '100%', padding: '11px', marginTop: 8, fontSize: 14.5, justifyContent: 'center' }}
             disabled={loading}
           >
-            {loading ? 'Signing in...' : 'Sign In'}
+            {loading ? 'Authenticating...' : 'Sign In'}
           </button>
         </form>
-        <p style={{ textAlign: 'center', marginTop: 16, fontSize: 12, color: 'var(--text-muted)' }}>
-          Officer / Admin access only. Contact your administrator to register.
+
+        <p style={{ textAlign: 'center', marginTop: 18, fontSize: 12, color: 'var(--text-muted)' }}>
+          Authorized Legal Metrology Officer & Admin Access Only
         </p>
       </div>
     </div>
